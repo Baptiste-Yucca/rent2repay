@@ -1,0 +1,28 @@
+# Hardhat files
+cache
+artifacts
+typechain
+typechain-types
+
+# Node
+node_modules
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Misc
+.DS_Store
+coverage
+coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
