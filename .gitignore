@@ -4,6 +4,8 @@ artifacts
 typechain
 typechain-types
 
+src_RMM/*
+
 # Node
 node_modules
 package-lock.json
