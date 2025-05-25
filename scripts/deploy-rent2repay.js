@@ -15,14 +15,25 @@ async function main() {
 
   console.log("Rent2RepayAuthorizer déployé à:", await rent2RepayAuthorizer.getAddress());
 
-  // Test d'autorisation avec l'utilisateur de test
-  console.log("\nTest d'autorisation avec l'utilisateur de test...");
-  const authorizeTransaction = await rent2RepayAuthorizer.connect(testUser).authorizeRent2Repay();
-  await authorizeTransaction.wait();
+  // Test de configuration avec l'utilisateur de test
+  console.log("\nConfiguration Rent2Repay avec l'utilisateur de test...");
+  const weeklyAmount = hre.ethers.parseEther("100"); // 100 ETH par semaine
+  const configureTransaction = await rent2RepayAuthorizer.connect(testUser).configureRent2Repay(weeklyAmount);
+  await configureTransaction.wait();
   
   // Vérification de l'autorisation
   const isAuthorized = await rent2RepayAuthorizer.isAuthorized(testUser.address);
   console.log("Utilisateur autorisé:", isAuthorized);
+  
+  // Récupération de la configuration
+  const [maxAmount, lastTimestamp, currentSpent] = await rent2RepayAuthorizer.getUserConfig(testUser.address);
+  console.log("Montant hebdomadaire max:", hre.ethers.formatEther(maxAmount), "ETH");
+  console.log("Dernier remboursement:", lastTimestamp.toString());
+  console.log("Dépensé cette semaine:", hre.ethers.formatEther(currentSpent), "ETH");
+  
+  // Test du montant disponible
+  const available = await rent2RepayAuthorizer.getAvailableAmountThisWeek(testUser.address);
+  console.log("Montant disponible cette semaine:", hre.ethers.formatEther(available), "ETH");
 
   console.log("\nDéploiement et tests terminés avec succès!");
 }
