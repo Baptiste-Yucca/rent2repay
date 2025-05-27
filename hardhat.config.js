@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
+require("solidity-docgen");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -8,5 +9,12 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545"
     }
+  },
+  docgen: {
+    path: './docs',
+    clear: true,
+    runOnCompile: true,
+    pages: 'files',
+    exclude: ['mocks/']
   }
 };

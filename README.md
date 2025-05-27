@@ -167,3 +167,138 @@ Ce projet est sous licence MIT.
 ## 📞 Contact
 
 Pour toute question ou suggestion, n'hésitez pas à ouvrir une issue sur GitHub.
+
+## Configuration de l'environnement de développement
+
+### Extensions VSCode recommandées
+
+Pour une meilleure expérience de développement Solidity, installez ces extensions dans VSCode :
+
+1. **Hardhat for Visual Studio Code** (`nomicfoundation.hardhat-solidity`)
+   - Syntaxe highlighting optimisée pour Solidity
+   - Intégration avec Hardhat
+   - Auto-completion intelligente
+
+2. **Solidity** (`juanblanco.solidity`)
+   - Support complet de Solidity
+   - Compilation en temps réel
+   - Détection d'erreurs
+
+3. **Solidity Visual Auditor** (`tintinweb.solidity-visual-auditor`)
+   - Coloration syntaxique avancée
+   - Détection de vulnérabilités
+   - Analyse de sécurité visuelle
+
+4. **Slither VSCode** (`trailofbits.slither-vscode`)
+   - Analyse statique de sécurité
+   - Détection d'erreurs communes
+
+### Installation rapide
+
+```bash
+# Installer les dépendances
+npm install
+
+# Formater le code
+npm run format
+
+# Vérifier le style de code
+npm run lint
+
+# Compiler les contrats
+npm run compile
+
+# Lancer les tests
+npm test
+
+# Générer la documentation
+npm run docs
+```
+
+### Scripts disponibles
+
+- `npm run format` - Formate automatiquement le code Solidity
+- `npm run format:check` - Vérifie si le code est bien formaté
+- `npm run lint` - Analyse le code pour détecter les problèmes
+- `npm run lint:fix` - Corrige automatiquement les problèmes de style
+- `npm test` - Lance les tests
+- `npm run compile` - Compile les contrats
+- `npm run docs` - Génère la documentation à partir des commentaires NatSpec
+
+## Structure du projet
+
+```
+contracts/
+├── Rent2RepayAuthorizer.sol    # Contrat principal d'autorisation
+└── mocks/                      # Contrats de test
+    ├── MockERC20.sol
+    └── MockRMM.sol
+
+test/
+└── Rent2RepayAuthorizer.test.js # Tests du contrat principal
+
+docs/                           # Documentation générée automatiquement
+```
+
+## Fonctionnalités principales
+
+### Rent2RepayAuthorizer
+
+Le contrat principal permet aux utilisateurs de :
+
+- ✅ Configurer des limites hebdomadaires de remboursement
+- ✅ Révoquer leur autorisation à tout moment
+- ✅ Suivre leurs dépenses par semaine
+- ✅ Validation automatique des limites avant remboursement
+
+### Optimisations
+
+- **Erreurs personnalisées** au lieu de `require()` pour économiser du gas
+- **Mappings séparés** au lieu de structures pour la compatibilité avec les upgrades
+- **Modificateurs réutilisables** pour la validation
+- **Documentation NatSpec complète** pour la génération automatique de docs
+
+## Configuration VSCode
+
+Le projet inclut des configurations VSCode optimisées dans `.vscode/` :
+
+- `settings.json` - Paramètres pour Solidity
+- `extensions.json` - Extensions recommandées
+
+### Thème recommandé
+
+Pour une meilleure lisibilité du code Solidity, utilisez un thème sombre comme :
+- **One Dark Pro**
+- **Material Theme**
+- **Dracula Official**
+
+## Amélioration de la lisibilité
+
+Le code utilise :
+
+- 🎨 **Syntaxe highlighting** avec les extensions VSCode
+- 📏 **Formatage automatique** avec Prettier
+- 🔍 **Linting** avec Solhint
+- 📖 **Documentation NatSpec** en anglais
+- 🏗️ **Structure claire** avec mappings séparés
+- ⚡ **Erreurs personnalisées** plus lisibles
+
+## Tests
+
+```bash
+# Lancer tous les tests
+npm test
+
+# Tests avec couverture (si configuré)
+npx hardhat coverage
+```
+
+## Documentation
+
+La documentation est générée automatiquement à partir des commentaires NatSpec :
+
+```bash
+npm run docs
+```
+
+La documentation sera disponible dans le dossier `docs/`.

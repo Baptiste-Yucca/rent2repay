@@ -1,117 +1,179 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+ * @title Rent2RepayAuthorizer
+ * @notice A contract that manages authorization for the Rent2Repay mechanism
+ * @dev This contract allows users to configure weekly spending limits for automated loan repayments
+ * Users can set a maximum amount that can be spent per week and the contract tracks usage
+ */
 contract Rent2RepayAuthorizer {
-    // Structure pour stocker toutes les informations d'un utilisateur
-    struct UserConfig {
-        uint256 weeklyMaxAmount;     // Montant maximum par semaine
-        uint256 lastRepayTimestamp;  // Timestamp du dernier remboursement
-        uint256 currentWeekSpent;    // Montant déjà remboursé cette semaine
-    }
+    /// @notice Constant for one week in seconds
+    uint256 private constant _WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
 
-    // Une seule map pour tout stocker
-    mapping(address => UserConfig) public userConfigs;
+    /// @notice Maps user addresses to their weekly maximum amount
+    mapping(address => uint256) public weeklyMaxAmounts;
+    
+    /// @notice Maps user addresses to their last repayment timestamp
+    mapping(address => uint256) public lastRepayTimestamps;
+    
+    /// @notice Maps user addresses to their current week spent amount
+    mapping(address => uint256) public currentWeekSpent;
 
-    // Constante pour une semaine en secondes
-    uint256 constant WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
-
-    // Événements
+    /// @notice Emitted when a user configures the Rent2Repay mechanism
+    /// @param user The user address that configured the system
+    /// @param weeklyMaxAmount The weekly maximum amount set by the user
     event Rent2RepayConfigured(address indexed user, uint256 weeklyMaxAmount);
+
+    /// @notice Emitted when a user revokes their Rent2Repay authorization
+    /// @param user The user address that revoked authorization
     event Rent2RepayRevoked(address indexed user);
-    event RepaymentExecuted(address indexed user, uint256 amount, uint256 remainingThisWeek);
+
+    /// @notice Emitted when a repayment is executed
+    /// @param user The user for whom the repayment was executed
+    /// @param amount The amount that was repaid
+    /// @param remainingThisWeek The remaining amount available this week
+    event RepaymentExecuted(
+        address indexed user, 
+        uint256 amount, 
+        uint256 remainingThisWeek
+    );
+
+    /// @notice Custom errors for better gas efficiency
+    error AmountMustBeGreaterThanZero();
+    error UserNotAuthorized();
+    error WeeklyLimitExceeded();
 
     /**
-     * @notice Configure le mécanisme Rent2Repay pour msg.sender
-     * @param weeklyMaxAmount Montant maximum autorisé par semaine (doit être > 0)
+     * @notice Validates that an amount is greater than zero
+     * @param amount The amount to validate
      */
-    function configureRent2Repay(uint256 weeklyMaxAmount) external {
-        require(weeklyMaxAmount > 0, "Amount must be greater than 0");
-        
-        userConfigs[msg.sender] = UserConfig({
-            weeklyMaxAmount: weeklyMaxAmount,
-            lastRepayTimestamp: 0,
-            currentWeekSpent: 0
-        });
+    modifier validAmount(uint256 amount) {
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        _;
+    }
+
+    /**
+     * @notice Validates that a user is authorized
+     * @param user The user address to validate
+     */
+    modifier onlyAuthorized(address user) {
+        if (!isAuthorized(user)) revert UserNotAuthorized();
+        _;
+    }
+
+    /**
+     * @notice Configures the Rent2Repay mechanism for the caller
+     * @dev Sets up weekly spending limits for automated repayments
+     * @param weeklyMaxAmount Maximum amount authorized per week (must be > 0)
+     */
+    function configureRent2Repay(uint256 weeklyMaxAmount) 
+        external 
+        validAmount(weeklyMaxAmount) 
+    {
+        weeklyMaxAmounts[msg.sender] = weeklyMaxAmount;
+        lastRepayTimestamps[msg.sender] = 0;
+        currentWeekSpent[msg.sender] = 0;
         
         emit Rent2RepayConfigured(msg.sender, weeklyMaxAmount);
     }
 
     /**
-     * @notice Révoque l'autorisation du mécanisme Rent2Repay pour msg.sender
+     * @notice Revokes the Rent2Repay authorization for the caller
+     * @dev Completely removes the user's configuration and authorization
      */
-    function revokeRent2Repay() external {
-        require(isAuthorized(msg.sender), "Not authorized");
+    function revokeRent2Repay() external onlyAuthorized(msg.sender) {
+        delete weeklyMaxAmounts[msg.sender];
+        delete lastRepayTimestamps[msg.sender];
+        delete currentWeekSpent[msg.sender];
         
-        delete userConfigs[msg.sender];
         emit Rent2RepayRevoked(msg.sender);
     }
 
     /**
-     * @notice Vérifie si un utilisateur a autorisé le mécanisme
-     * @param user Adresse de l'utilisateur
-     * @return true si autorisé (weeklyMaxAmount > 0)
+     * @notice Checks if a user has authorized the Rent2Repay mechanism
+     * @param user Address of the user to check
+     * @return true if authorized (weeklyMaxAmount > 0), false otherwise
      */
     function isAuthorized(address user) public view returns (bool) {
-        return userConfigs[user].weeklyMaxAmount > 0;
+        return weeklyMaxAmounts[user] > 0;
     }
 
     /**
-     * @notice Calcule le montant disponible pour remboursement cette semaine
-     * @param user Adresse de l'utilisateur
-     * @return Montant disponible pour cette semaine
+     * @notice Calculates the available amount for repayment this week
+     * @dev If more than a week has passed since last repayment, resets the weekly counter
+     * @param user Address of the user
+     * @return Available amount for repayment this week
      */
     function getAvailableAmountThisWeek(address user) public view returns (uint256) {
-        UserConfig memory config = userConfigs[user];
+        uint256 maxAmount = weeklyMaxAmounts[user];
         
-        if (config.weeklyMaxAmount == 0) {
-            return 0; // Utilisateur non autorisé
+        if (maxAmount == 0) {
+            return 0; // User not authorized
         }
 
-        // Si plus d'une semaine s'est écoulée, reset le compteur
-        if (block.timestamp >= config.lastRepayTimestamp + WEEK_IN_SECONDS) {
-            return config.weeklyMaxAmount;
-        }
-
-        // Sinon, retourner ce qui reste pour cette semaine
-        return config.weeklyMaxAmount - config.currentWeekSpent;
+        return _isNewWeek(lastRepayTimestamps[user]) 
+            ? maxAmount 
+            : maxAmount - currentWeekSpent[user];
     }
 
     /**
-     * @notice Fonction appelée avant un remboursement pour vérifier et mettre à jour les limites
-     * @param user Adresse de l'utilisateur pour qui effectuer le remboursement
-     * @param amount Montant à rembourser
-     * @return true si le remboursement est autorisé
+     * @notice Validates and updates repayment limits before a repayment
+     * @dev This function should be called before executing any repayment to ensure 
+     * limits are respected
+     * @param user Address of the user for whom to execute the repayment
+     * @param amount Amount to be repaid
+     * @return true if the repayment is authorized and limits updated
      */
-    function validateAndUpdateRepayment(address user, uint256 amount) external returns (bool) {
-        require(amount > 0, "Amount must be greater than 0");
-        require(isAuthorized(user), "User not authorized");
-
-        UserConfig storage config = userConfigs[user];
-
-        // Si plus d'une semaine s'est écoulée, reset le compteur
-        if (block.timestamp >= config.lastRepayTimestamp + WEEK_IN_SECONDS) {
-            config.currentWeekSpent = 0;
+    function validateAndUpdateRepayment(address user, uint256 amount) 
+        external 
+        validAmount(amount) 
+        onlyAuthorized(user) 
+        returns (bool) 
+    {
+        // Reset weekly counter if a new week has started
+        if (_isNewWeek(lastRepayTimestamps[user])) {
+            currentWeekSpent[user] = 0;
         }
 
-        // Vérifier si le montant est dans la limite
-        require(config.currentWeekSpent + amount <= config.weeklyMaxAmount, "Weekly limit exceeded");
+        // Check if the amount is within the limit
+        uint256 newSpentAmount = currentWeekSpent[user] + amount;
+        if (newSpentAmount > weeklyMaxAmounts[user]) revert WeeklyLimitExceeded();
 
-        // Mettre à jour les valeurs
-        config.currentWeekSpent += amount;
-        config.lastRepayTimestamp = block.timestamp;
+        // Update the values
+        currentWeekSpent[user] = newSpentAmount;
+        lastRepayTimestamps[user] = block.timestamp;
 
-        emit RepaymentExecuted(user, amount, config.weeklyMaxAmount - config.currentWeekSpent);
+        emit RepaymentExecuted(user, amount, weeklyMaxAmounts[user] - newSpentAmount);
         
         return true;
     }
 
     /**
-     * @notice Récupère la configuration d'un utilisateur
-     * @param user Adresse de l'utilisateur
-     * @return weeklyMaxAmount, lastRepayTimestamp, currentWeekSpent
+     * @notice Retrieves a user's configuration
+     * @param user Address of the user
+     * @return weeklyMaxAmount The maximum amount per week
+     * @return lastRepayTimestamp Timestamp of the last repayment
+     * @return currentSpent Amount spent in the current week
      */
-    function getUserConfig(address user) external view returns (uint256, uint256, uint256) {
-        UserConfig memory config = userConfigs[user];
-        return (config.weeklyMaxAmount, config.lastRepayTimestamp, config.currentWeekSpent);
+    function getUserConfig(address user) 
+        external 
+        view 
+        returns (uint256, uint256, uint256) 
+    {
+        return (
+            weeklyMaxAmounts[user], 
+            lastRepayTimestamps[user], 
+            currentWeekSpent[user]
+        );
+    }
+
+    /**
+     * @notice Internal function to check if a new week has started
+     * @param lastTimestamp The last recorded timestamp
+     * @return true if more than a week has passed since lastTimestamp
+     */
+    function _isNewWeek(uint256 lastTimestamp) internal view returns (bool) {
+        return block.timestamp >= lastTimestamp + _WEEK_IN_SECONDS;
     }
 } 

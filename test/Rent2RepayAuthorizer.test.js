@@ -31,7 +31,7 @@ describe("Rent2RepayAuthorizer", function () {
 
         it("Should not allow user to configure Rent2Repay with zero amount", async function () {
             await expect(rent2RepayAuthorizer.connect(user).configureRent2Repay(0))
-                .to.be.revertedWith("Amount must be greater than 0");
+                .to.be.revertedWithCustomError(rent2RepayAuthorizer, "AmountMustBeGreaterThanZero");
         });
 
         it("Should allow user to reconfigure with different amount", async function () {
@@ -58,7 +58,7 @@ describe("Rent2RepayAuthorizer", function () {
 
         it("Should not allow user to revoke Rent2Repay if not authorized", async function () {
             await expect(rent2RepayAuthorizer.connect(user).revokeRent2Repay())
-                .to.be.revertedWith("Not authorized");
+                .to.be.revertedWithCustomError(rent2RepayAuthorizer, "UserNotAuthorized");
         });
     });
 
@@ -88,14 +88,19 @@ describe("Rent2RepayAuthorizer", function () {
             const repayAmount = ethers.parseEther("150");
             
             await expect(rent2RepayAuthorizer.validateAndUpdateRepayment(user.address, repayAmount))
-                .to.be.revertedWith("Weekly limit exceeded");
+                .to.be.revertedWithCustomError(rent2RepayAuthorizer, "WeeklyLimitExceeded");
         });
 
         it("Should reject repayment for unauthorized user", async function () {
             const repayAmount = ethers.parseEther("50");
             
             await expect(rent2RepayAuthorizer.validateAndUpdateRepayment(owner.address, repayAmount))
-                .to.be.revertedWith("User not authorized");
+                .to.be.revertedWithCustomError(rent2RepayAuthorizer, "UserNotAuthorized");
+        });
+
+        it("Should reject zero amount repayment", async function () {
+            await expect(rent2RepayAuthorizer.validateAndUpdateRepayment(user.address, 0))
+                .to.be.revertedWithCustomError(rent2RepayAuthorizer, "AmountMustBeGreaterThanZero");
         });
     });
 }); 
