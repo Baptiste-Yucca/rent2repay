@@ -57,6 +57,9 @@ contract Rent2Repay is AccessControl, Pausable {
     error UserNotAuthorized();
     error WeeklyLimitExceeded();
     error OnlyUserCanRevokeOwn();
+    error InvalidUserAddress();
+    error CannotRepayForSelf();
+    error ContractPaused();
 
     /**
      * @notice Constructor that sets up roles
@@ -86,6 +89,24 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     modifier userIsAuthorized(address user) {
         if (!isAuthorized(user)) revert UserNotAuthorized();
+        _;
+    }
+
+    /**
+     * @notice Validates that an address is not the zero address
+     * @param addr The address to validate
+     */
+    modifier validAddress(address addr) {
+        if (addr == address(0)) revert InvalidUserAddress();
+        _;
+    }
+
+    /**
+     * @notice Validates that the caller is not trying to repay for themselves
+     * @param user The user address to validate
+     */
+    modifier notSelf(address user) {
+        if (user == msg.sender) revert CannotRepayForSelf();
         _;
     }
 
@@ -180,10 +201,15 @@ contract Rent2Repay is AccessControl, Pausable {
     function rent2repay(address user, uint256 amount) 
         external 
         whenNotPaused
+        validAddress(user)
+        notSelf(user)
         validAmount(amount) 
         userIsAuthorized(user) 
         returns (bool) 
     {
+        // Additional safety check: ensure contract is not in an invalid state
+        if (paused()) revert ContractPaused();
+        
         // Reset weekly counter if a new week has started
         if (_isNewWeek(lastRepayTimestamps[user])) {
             currentWeekSpent[user] = 0;
@@ -193,11 +219,18 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 newSpentAmount = currentWeekSpent[user] + amount;
         if (newSpentAmount > weeklyMaxAmounts[user]) revert WeeklyLimitExceeded();
 
+        // Additional security: prevent overflow attacks
+        require(newSpentAmount >= currentWeekSpent[user], "Overflow protection");
+        require(newSpentAmount >= amount, "Overflow protection");
+
         // Update the values
         currentWeekSpent[user] = newSpentAmount;
         lastRepayTimestamps[user] = block.timestamp;
 
-        emit RepaymentExecuted(user, amount, weeklyMaxAmounts[user] - newSpentAmount);
+        // Calculate remaining amount for event
+        uint256 remainingThisWeek = weeklyMaxAmounts[user] - newSpentAmount;
+        
+        emit RepaymentExecuted(user, amount, remainingThisWeek);
         
         return true;
     }

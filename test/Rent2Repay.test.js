@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("Rent2Repay", function () {
-    let rent2Repay;
+    let rent2Repay, mockRMM, repaymentToken;
     let admin, emergency, operator, user, otherUser, anyone;
 
     // Constantes
@@ -13,13 +13,37 @@ describe("Rent2Repay", function () {
     beforeEach(async function () {
         [admin, emergency, operator, user, otherUser, anyone] = await ethers.getSigners();
 
+        // Déployer le token de repayment
+        const MockERC20 = await ethers.getContractFactory("MockERC20");
+        repaymentToken = await MockERC20.deploy("USD Coin", "USDC");
+        await repaymentToken.waitForDeployment();
+
+        // Déployer le MockRMM
+        const MockRMM = await ethers.getContractFactory("MockRMM");
+        mockRMM = await MockRMM.deploy();
+        await mockRMM.waitForDeployment();
+
+        // Déployer Rent2Repay avec RMM et token
         const Rent2Repay = await ethers.getContractFactory("Rent2Repay");
         rent2Repay = await Rent2Repay.deploy(
             admin.address,
             emergency.address,
-            operator.address
+            operator.address,
+            await mockRMM.getAddress(),
+            await repaymentToken.getAddress()
         );
         await rent2Repay.waitForDeployment();
+
+        // Mint des tokens pour les tests et configuriner des dettes
+        const mintAmount = ethers.parseEther("1000");
+        await repaymentToken.mint(user.address, mintAmount);
+        await repaymentToken.mint(otherUser.address, mintAmount);
+        await repaymentToken.mint(anyone.address, mintAmount);
+
+        // Configurer des dettes dans le MockRMM pour les tests
+        const debtAmount = ethers.parseEther("500");
+        await mockRMM.setDebt(user.address, await repaymentToken.getAddress(), debtAmount);
+        await mockRMM.setDebt(otherUser.address, await repaymentToken.getAddress(), debtAmount);
     });
 
     describe("Deployment & Roles", function () {
@@ -48,10 +72,10 @@ describe("Rent2Repay", function () {
 
             expect(await rent2Repay.isAuthorized(user.address)).to.be.true;
 
-            const [maxAmount, lastTimestamp, currentSpent] = await rent2Repay.getUserConfig(user.address);
-            expect(maxAmount).to.equal(WEEKLY_AMOUNT);
-            expect(lastTimestamp).to.equal(0);
-            expect(currentSpent).to.equal(0);
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.weeklyMaxAmount).to.equal(WEEKLY_AMOUNT);
+            expect(userConfig.lastRepayTimestamp).to.equal(0);
+            expect(userConfig.currentWeekSpent).to.equal(0);
         });
 
         it("Should not allow configuration with zero amount", async function () {
@@ -72,8 +96,8 @@ describe("Rent2Repay", function () {
             await rent2Repay.connect(user).configureRent2Repay(WEEKLY_AMOUNT);
             await rent2Repay.connect(user).configureRent2Repay(newAmount);
 
-            const [maxAmount] = await rent2Repay.getUserConfig(user.address);
-            expect(maxAmount).to.equal(newAmount);
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.weeklyMaxAmount).to.equal(newAmount);
         });
     });
 
@@ -89,10 +113,10 @@ describe("Rent2Repay", function () {
 
             expect(await rent2Repay.isAuthorized(user.address)).to.be.false;
 
-            const [maxAmount, lastTimestamp, currentSpent] = await rent2Repay.getUserConfig(user.address);
-            expect(maxAmount).to.equal(0);
-            expect(lastTimestamp).to.equal(0);
-            expect(currentSpent).to.equal(0);
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.weeklyMaxAmount).to.equal(0);
+            expect(userConfig.lastRepayTimestamp).to.equal(0);
+            expect(userConfig.currentWeekSpent).to.equal(0);
         });
 
         it("Should not allow non-authorized user to revoke", async function () {
@@ -165,12 +189,30 @@ describe("Rent2Repay", function () {
         it("Should allow anyone to validate repayment within limits", async function () {
             const repayAmount = ethers.parseEther("50");
 
+            // Approuver le contrat pour dépenser les tokens
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), repayAmount);
+
             await expect(rent2Repay.connect(anyone).rent2repay(user.address, repayAmount))
                 .to.emit(rent2Repay, "RepaymentExecuted")
-                .withArgs(user.address, repayAmount, ethers.parseEther("50"));
+                .withArgs(user.address, repayAmount, ethers.parseEther("50"), anyone.address);
 
-            const [, , currentSpent] = await rent2Repay.getUserConfig(user.address);
-            expect(currentSpent).to.equal(repayAmount);
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.currentWeekSpent).to.equal(repayAmount);
+        });
+
+        it("Should reject repayment with zero address", async function () {
+            const repayAmount = ethers.parseEther("50");
+            const zeroAddress = "0x0000000000000000000000000000000000000000";
+
+            await expect(rent2Repay.connect(anyone).rent2repay(zeroAddress, repayAmount))
+                .to.be.revertedWithCustomError(rent2Repay, "InvalidUserAddress");
+        });
+
+        it("Should reject repayment when user tries to repay for themselves", async function () {
+            const repayAmount = ethers.parseEther("50");
+
+            await expect(rent2Repay.connect(user).rent2repay(user.address, repayAmount))
+                .to.be.revertedWithCustomError(rent2Repay, "CannotRepayForSelf");
         });
 
         it("Should reject repayment when paused", async function () {
@@ -182,6 +224,9 @@ describe("Rent2Repay", function () {
 
         it("Should reject repayment exceeding weekly limit", async function () {
             const repayAmount = ethers.parseEther("150");
+
+            // Approuver le contrat pour dépenser les tokens
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), repayAmount);
 
             await expect(rent2Repay.connect(anyone).rent2repay(user.address, repayAmount))
                 .to.be.revertedWithCustomError(rent2Repay, "WeeklyLimitExceeded");
@@ -201,18 +246,61 @@ describe("Rent2Repay", function () {
             const firstRepay = ethers.parseEther("30");
             const secondRepay = ethers.parseEther("40");
 
+            // Approuver le contrat pour dépenser les tokens
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), firstRepay + secondRepay);
+
             await rent2Repay.connect(anyone).rent2repay(user.address, firstRepay);
             await rent2Repay.connect(anyone).rent2repay(user.address, secondRepay);
 
-            const available = await rent2Repay.getAvailableAmountThisWeek(user.address);
-            expect(available).to.equal(ethers.parseEther("30")); // 100 - 30 - 40 = 30
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.currentWeekSpent).to.equal(ethers.parseEther("70")); // 30 + 40 = 70
         });
 
         it("Should reject repayment when cumulative amount exceeds limit", async function () {
+            // Approuver le contrat pour dépenser les tokens
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), ethers.parseEther("60"));
             await rent2Repay.connect(anyone).rent2repay(user.address, ethers.parseEther("60"));
+
+            // Approuver pour le second repayment
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), ethers.parseEther("50"));
 
             await expect(rent2Repay.connect(anyone).rent2repay(user.address, ethers.parseEther("50")))
                 .to.be.revertedWithCustomError(rent2Repay, "WeeklyLimitExceeded");
+        });
+
+        it("Should handle edge case with maximum uint256 amount (overflow protection)", async function () {
+            const maxUint256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+
+            await expect(rent2Repay.connect(anyone).rent2repay(user.address, maxUint256))
+                .to.be.revertedWithCustomError(rent2Repay, "WeeklyLimitExceeded");
+        });
+
+        it("Should properly calculate remaining amount in event", async function () {
+            const repayAmount = ethers.parseEther("30");
+            const expectedRemaining = ethers.parseEther("70");
+
+            // Approuver le contrat pour dépenser les tokens
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), repayAmount);
+
+            const tx = await rent2Repay.connect(anyone).rent2repay(user.address, repayAmount);
+            const receipt = await tx.wait();
+
+            // Vérifier l'événement
+            const event = receipt.logs.find(log => log.fragment?.name === "RepaymentExecuted");
+            expect(event.args[0]).to.equal(user.address);
+            expect(event.args[1]).to.equal(repayAmount);
+            expect(event.args[2]).to.equal(expectedRemaining);
+            expect(event.args[3]).to.equal(anyone.address);
+        });
+
+        it("Should reject repayment when caller has insufficient tokens", async function () {
+            const repayAmount = ethers.parseEther("2000"); // Plus que le montant minté (1000)
+
+            // Approuver le contrat même avec un montant insuffisant
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), repayAmount);
+
+            await expect(rent2Repay.connect(anyone).rent2repay(user.address, repayAmount))
+                .to.be.revertedWithCustomError(rent2Repay, "InsufficientTokenBalance");
         });
     });
 
@@ -223,19 +311,24 @@ describe("Rent2Repay", function () {
 
         it("Should reset weekly limit after one week", async function () {
             // Premier repayment
-            await rent2Repay.connect(anyone).rent2repay(user.address, ethers.parseEther("80"));
+            const firstAmount = ethers.parseEther("80");
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), firstAmount);
+            await rent2Repay.connect(anyone).rent2repay(user.address, firstAmount);
 
-            expect(await rent2Repay.getAvailableAmountThisWeek(user.address)).to.equal(ethers.parseEther("20"));
+            let userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.currentWeekSpent).to.equal(firstAmount);
 
             // Avancer d'une semaine
             await time.increase(WEEK_IN_SECONDS);
 
-            // Le montant disponible devrait être réinitialisé
-            expect(await rent2Repay.getAvailableAmountThisWeek(user.address)).to.equal(WEEKLY_AMOUNT);
-
             // Nouveau repayment devrait fonctionner
-            await expect(rent2Repay.connect(anyone).rent2repay(user.address, ethers.parseEther("90")))
+            const secondAmount = ethers.parseEther("90");
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), secondAmount);
+            await expect(rent2Repay.connect(anyone).rent2repay(user.address, secondAmount))
                 .to.emit(rent2Repay, "RepaymentExecuted");
+
+            userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.currentWeekSpent).to.equal(secondAmount); // Doit être remis à zéro puis le nouveau montant
         });
 
         it("Should return full amount for user with no previous repayments", async function () {
@@ -263,44 +356,53 @@ describe("Rent2Repay", function () {
         it("Should return correct user configuration", async function () {
             await rent2Repay.connect(user).configureRent2Repay(WEEKLY_AMOUNT);
 
-            const [maxAmount, lastTimestamp, currentSpent] = await rent2Repay.getUserConfig(user.address);
-            expect(maxAmount).to.equal(WEEKLY_AMOUNT);
-            expect(lastTimestamp).to.equal(0);
-            expect(currentSpent).to.equal(0);
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.weeklyMaxAmount).to.equal(WEEKLY_AMOUNT);
+            expect(userConfig.lastRepayTimestamp).to.equal(0);
+            expect(userConfig.currentWeekSpent).to.equal(0);
 
             // Après un repayment
-            await rent2Repay.connect(anyone).rent2repay(user.address, ethers.parseEther("30"));
+            const repayAmount = ethers.parseEther("30");
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), repayAmount);
+            await rent2Repay.connect(anyone).rent2repay(user.address, repayAmount);
 
-            const [, newTimestamp, newSpent] = await rent2Repay.getUserConfig(user.address);
-            expect(newTimestamp).to.be.greaterThan(0);
-            expect(newSpent).to.equal(ethers.parseEther("30"));
+            const newUserConfig = await rent2Repay.userConfigs(user.address);
+            expect(newUserConfig.lastRepayTimestamp).to.be.greaterThan(0);
+            expect(newUserConfig.currentWeekSpent).to.equal(repayAmount);
         });
     });
 
     describe("Edge Cases", function () {
         it("Should handle user reconfiguring after spending", async function () {
             await rent2Repay.connect(user).configureRent2Repay(WEEKLY_AMOUNT);
-            await rent2Repay.connect(anyone).rent2repay(user.address, ethers.parseEther("50"));
+
+            const repayAmount = ethers.parseEther("50");
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), repayAmount);
+            await rent2Repay.connect(anyone).rent2repay(user.address, repayAmount);
 
             // Reconfiguration avec un montant plus élevé
             const newAmount = ethers.parseEther("200");
             await rent2Repay.connect(user).configureRent2Repay(newAmount);
 
             // Les données devraient être réinitialisées
-            const [maxAmount, lastTimestamp, currentSpent] = await rent2Repay.getUserConfig(user.address);
-            expect(maxAmount).to.equal(newAmount);
-            expect(lastTimestamp).to.equal(0);
-            expect(currentSpent).to.equal(0);
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.weeklyMaxAmount).to.equal(newAmount);
+            expect(userConfig.lastRepayTimestamp).to.equal(0);
+            expect(userConfig.currentWeekSpent).to.equal(0);
         });
 
         it("Should handle operator removing user after partial spending", async function () {
             await rent2Repay.connect(user).configureRent2Repay(WEEKLY_AMOUNT);
-            await rent2Repay.connect(anyone).rent2repay(user.address, ethers.parseEther("50"));
+
+            const repayAmount = ethers.parseEther("50");
+            await repaymentToken.connect(anyone).approve(await rent2Repay.getAddress(), repayAmount);
+            await rent2Repay.connect(anyone).rent2repay(user.address, repayAmount);
 
             await rent2Repay.connect(operator).removeUser(user.address);
 
             expect(await rent2Repay.isAuthorized(user.address)).to.be.false;
-            expect(await rent2Repay.getAvailableAmountThisWeek(user.address)).to.equal(0);
+            const userConfig = await rent2Repay.userConfigs(user.address);
+            expect(userConfig.weeklyMaxAmount).to.equal(0);
         });
     });
 }); 

@@ -227,6 +227,50 @@ async function main() {
         return;
     }
 
+    // Test 8: Contrôles de sécurité rent2repay
+    console.log("🔒 Test 8: Contrôles de sécurité rent2repay");
+    try {
+        // Reconfigurer user1 pour les tests
+        await rent2Repay.connect(user1).configureRent2Repay(ethers.parseEther("100"));
+
+        // Test 8a: Adresse zéro
+        let zeroAddressBlocked = false;
+        try {
+            const zeroAddress = "0x0000000000000000000000000000000000000000";
+            await rent2Repay.connect(user2).rent2repay(zeroAddress, ethers.parseEther("10"));
+        } catch (error) {
+            if (error.message.includes("InvalidUserAddress")) {
+                zeroAddressBlocked = true;
+            }
+        }
+        console.log("- Adresse zéro bloquée:", zeroAddressBlocked ? "oui ✅" : "non ❌");
+
+        // Test 8b: Auto-repayment bloqué
+        let selfRepaymentBlocked = false;
+        try {
+            await rent2Repay.connect(user1).rent2repay(user1.address, ethers.parseEther("10"));
+        } catch (error) {
+            if (error.message.includes("CannotRepayForSelf")) {
+                selfRepaymentBlocked = true;
+            }
+        }
+        console.log("- Auto-repayment bloqué:", selfRepaymentBlocked ? "oui ✅" : "non ❌");
+
+        // Test 8c: Repayment normal fonctionne
+        const normalRepayment = await rent2Repay.connect(user2).rent2repay(user1.address, ethers.parseEther("20"));
+        const normalSuccess = normalRepayment !== undefined;
+        console.log("- Repayment normal fonctionne:", normalSuccess ? "oui ✅" : "non ❌");
+
+        if (zeroAddressBlocked && selfRepaymentBlocked && normalSuccess) {
+            console.log("✅ Test 8 réussi: Contrôles de sécurité fonctionnent\n");
+        } else {
+            throw new Error("Contrôles de sécurité défaillants");
+        }
+    } catch (error) {
+        console.log("❌ Test 8 échoué:", error.message);
+        return;
+    }
+
     // Résumé des tests
     console.log("📋 Résumé des tests :");
     console.log("✅ Test 1: Vérification des rôles");
@@ -236,10 +280,11 @@ async function main() {
     console.log("✅ Test 5: Fonctions d'urgence");
     console.log("✅ Test 6: Fonctions opérateur");
     console.log("✅ Test 7: Révocation utilisateur");
+    console.log("✅ Test 8: Contrôles de sécurité rent2repay");
     console.log();
 
     console.log("🎉 Tous les tests post-déploiement ont réussi !");
-    console.log("Le contrat Rent2Repay fonctionne parfaitement.");
+    console.log("Le contrat Rent2Repay fonctionne parfaitement avec sécurité renforcée.");
 }
 
 // Gestion des erreurs
