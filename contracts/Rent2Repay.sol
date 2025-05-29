@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+
 /**
- * @title Rent2RepayAuthorizer
+ * @title Rent2Repay
  * @notice A contract that manages authorization for the Rent2Repay mechanism
  * @dev This contract allows users to configure weekly spending limits for automated loan repayments
  * Users can set a maximum amount that can be spent per week and the contract tracks usage
  */
-contract Rent2RepayAuthorizer {
+contract Rent2Repay is AccessControl, Pausable {
     /// @notice Constant for one week in seconds
     uint256 private constant _WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
+
+    /// @notice Role definitions
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @notice Maps user addresses to their weekly maximum amount
     mapping(address => uint256) public weeklyMaxAmounts;
@@ -29,6 +37,11 @@ contract Rent2RepayAuthorizer {
     /// @param user The user address that revoked authorization
     event Rent2RepayRevoked(address indexed user);
 
+    /// @notice Emitted when an operator forcibly removes a user
+    /// @param operator The operator who removed the user
+    /// @param user The user that was removed
+    event UserRemovedByOperator(address indexed operator, address indexed user);
+
     /// @notice Emitted when a repayment is executed
     /// @param user The user for whom the repayment was executed
     /// @param amount The amount that was repaid
@@ -43,6 +56,20 @@ contract Rent2RepayAuthorizer {
     error AmountMustBeGreaterThanZero();
     error UserNotAuthorized();
     error WeeklyLimitExceeded();
+    error OnlyUserCanRevokeOwn();
+
+    /**
+     * @notice Constructor that sets up roles
+     * @param admin Address that will have admin privileges
+     * @param emergency Address that will have emergency privileges
+     * @param operator Address that will have operator privileges
+     */
+    constructor(address admin, address emergency, address operator) {
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(ADMIN_ROLE, admin);
+        _grantRole(EMERGENCY_ROLE, emergency);
+        _grantRole(OPERATOR_ROLE, operator);
+    }
 
     /**
      * @notice Validates that an amount is greater than zero
@@ -54,10 +81,10 @@ contract Rent2RepayAuthorizer {
     }
 
     /**
-     * @notice Validates that a user is authorized
+     * @notice Validates that a user has configured Rent2Repay
      * @param user The user address to validate
      */
-    modifier onlyAuthorized(address user) {
+    modifier userIsAuthorized(address user) {
         if (!isAuthorized(user)) revert UserNotAuthorized();
         _;
     }
@@ -69,6 +96,7 @@ contract Rent2RepayAuthorizer {
      */
     function configureRent2Repay(uint256 weeklyMaxAmount) 
         external 
+        whenNotPaused
         validAmount(weeklyMaxAmount) 
     {
         weeklyMaxAmounts[msg.sender] = weeklyMaxAmount;
@@ -80,14 +108,39 @@ contract Rent2RepayAuthorizer {
 
     /**
      * @notice Revokes the Rent2Repay authorization for the caller
-     * @dev Completely removes the user's configuration and authorization
+     * @dev Only the user themselves can revoke their own authorization
      */
-    function revokeRent2Repay() external onlyAuthorized(msg.sender) {
-        delete weeklyMaxAmounts[msg.sender];
-        delete lastRepayTimestamps[msg.sender];
-        delete currentWeekSpent[msg.sender];
-        
+    function revokeRent2Repay() external userIsAuthorized(msg.sender) {
+        _removeUser(msg.sender);
         emit Rent2RepayRevoked(msg.sender);
+    }
+
+    /**
+     * @notice Allows operators to remove a user from the system
+     * @dev Only operators can force-remove users
+     * @param user The user to remove
+     */
+    function removeUser(address user) 
+        external 
+        onlyRole(OPERATOR_ROLE) 
+        userIsAuthorized(user) 
+    {
+        _removeUser(user);
+        emit UserRemovedByOperator(msg.sender, user);
+    }
+
+    /**
+     * @notice Pauses the contract - only emergency role can do this
+     */
+    function pause() external onlyRole(EMERGENCY_ROLE) {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses the contract - only emergency role can do this
+     */
+    function unpause() external onlyRole(EMERGENCY_ROLE) {
+        _unpause();
     }
 
     /**
@@ -118,17 +171,17 @@ contract Rent2RepayAuthorizer {
     }
 
     /**
-     * @notice Validates and updates repayment limits before a repayment
-     * @dev This function should be called before executing any repayment to ensure 
-     * limits are respected
+     * @notice Executes automatic repayment for a user
+     * @dev This function can be called by anyone to execute automatic repayments
      * @param user Address of the user for whom to execute the repayment
      * @param amount Amount to be repaid
      * @return true if the repayment is authorized and limits updated
      */
-    function validateAndUpdateRepayment(address user, uint256 amount) 
+    function rent2repay(address user, uint256 amount) 
         external 
+        whenNotPaused
         validAmount(amount) 
-        onlyAuthorized(user) 
+        userIsAuthorized(user) 
         returns (bool) 
     {
         // Reset weekly counter if a new week has started
@@ -166,6 +219,16 @@ contract Rent2RepayAuthorizer {
             lastRepayTimestamps[user], 
             currentWeekSpent[user]
         );
+    }
+
+    /**
+     * @notice Internal function to remove a user from the system
+     * @param user The user to remove
+     */
+    function _removeUser(address user) internal {
+        delete weeklyMaxAmounts[user];
+        delete lastRepayTimestamps[user];
+        delete currentWeekSpent[user];
     }
 
     /**
