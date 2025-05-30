@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/IRMM.sol";
 
 /**
  * @title Rent2Repay
@@ -18,6 +20,15 @@ contract Rent2Repay is AccessControl, Pausable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
+    /// @notice RMM contract interface
+    IRMM public immutable rmm;
+    
+    /// @notice Default asset for repayments (can be configured)
+    address public repaymentAsset;
+    
+    /// @notice Default interest rate mode (2 = Variable rate)
+    uint256 public constant DEFAULT_INTEREST_RATE_MODE = 2;
 
     /// @notice Maps user addresses to their weekly maximum amount
     mapping(address => uint256) public weeklyMaxAmounts;
@@ -62,16 +73,27 @@ contract Rent2Repay is AccessControl, Pausable {
     error ContractPaused();
 
     /**
-     * @notice Constructor that sets up roles
+     * @notice Constructor that sets up roles and RMM integration
      * @param admin Address that will have admin privileges
      * @param emergency Address that will have emergency privileges
      * @param operator Address that will have operator privileges
+     * @param _rmm Address of the RMM contract
+     * @param _repaymentAsset Address of the asset used for repayments
      */
-    constructor(address admin, address emergency, address operator) {
+    constructor(
+        address admin, 
+        address emergency, 
+        address operator,
+        address _rmm,
+        address _repaymentAsset
+    ) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
         _grantRole(EMERGENCY_ROLE, emergency);
         _grantRole(OPERATOR_ROLE, operator);
+        
+        rmm = IRMM(_rmm);
+        repaymentAsset = _repaymentAsset;
     }
 
     /**
@@ -207,9 +229,6 @@ contract Rent2Repay is AccessControl, Pausable {
         userIsAuthorized(user) 
         returns (bool) 
     {
-        // Additional safety check: ensure contract is not in an invalid state
-        if (paused()) revert ContractPaused();
-        
         // Reset weekly counter if a new week has started
         if (_isNewWeek(lastRepayTimestamps[user])) {
             currentWeekSpent[user] = 0;
@@ -221,16 +240,29 @@ contract Rent2Repay is AccessControl, Pausable {
 
         // Additional security: prevent overflow attacks
         require(newSpentAmount >= currentWeekSpent[user], "Overflow protection");
-        require(newSpentAmount >= amount, "Overflow protection");
 
-        // Update the values
+        // Transfer and approve tokens for RMM
+        IERC20(repaymentAsset).transferFrom(msg.sender, address(this), amount);
+        IERC20(repaymentAsset).approve(address(rmm), amount);
+
+        // Call RMM repay function
+        uint256 actualAmountRepaid = rmm.repay(
+            repaymentAsset,
+            amount,
+            DEFAULT_INTEREST_RATE_MODE,
+            user
+        );
+
+        // Update the values only after successful repayment
         currentWeekSpent[user] = newSpentAmount;
         lastRepayTimestamps[user] = block.timestamp;
 
-        // Calculate remaining amount for event
-        uint256 remainingThisWeek = weeklyMaxAmounts[user] - newSpentAmount;
-        
-        emit RepaymentExecuted(user, amount, remainingThisWeek);
+        // Emit event with remaining amount
+        emit RepaymentExecuted(
+            user, 
+            actualAmountRepaid, 
+            weeklyMaxAmounts[user] - newSpentAmount
+        );
         
         return true;
     }
@@ -271,5 +303,36 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function _isNewWeek(uint256 lastTimestamp) internal view returns (bool) {
         return block.timestamp >= lastTimestamp + _WEEK_IN_SECONDS;
+    }
+
+    /**
+     * @notice Allows admins to update the repayment asset
+     * @param newRepaymentAsset The new asset address to use for repayments
+     */
+    function setRepaymentAsset(address newRepaymentAsset) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+        validAddress(newRepaymentAsset)
+    {
+        repaymentAsset = newRepaymentAsset;
+    }
+
+    /**
+     * @notice Emergency function to recover tokens sent to this contract
+     * @param token The token to recover
+     * @param amount The amount to recover
+     * @param to The address to send recovered tokens to
+     */
+    function emergencyTokenRecovery(
+        address token, 
+        uint256 amount, 
+        address to
+    ) 
+        external 
+        onlyRole(EMERGENCY_ROLE) 
+        validAddress(token)
+        validAddress(to)
+    {
+        IERC20(token).transfer(to, amount);
     }
 } 

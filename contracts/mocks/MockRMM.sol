@@ -26,9 +26,16 @@ contract MockRMM {
      * @dev Transfers tokens from the caller to this contract and reduces the borrower's debt
      * @param asset The asset being repaid (token address)
      * @param amount The amount of debt to repay
+     * @param interestRateMode The interest rate mode (ignored in mock, for compatibility)
      * @param onBehalfOf The address of the borrower whose debt is being repaid
+     * @return The final amount repaid
      */
-    function repay(address asset, uint256 amount, address onBehalfOf) external {
+    function repay(
+        address asset, 
+        uint256 amount, 
+        uint256 interestRateMode,
+        address onBehalfOf
+    ) external returns (uint256) {
         IERC20 token = IERC20(asset);
         
         // Transfer tokens from caller to this contract
@@ -40,6 +47,9 @@ contract MockRMM {
         debts[onBehalfOf][asset] -= amount;
         
         emit RepaymentMade(asset, amount, onBehalfOf, msg.sender);
+        
+        // Return the amount actually repaid
+        return amount;
     }
 
     /**
