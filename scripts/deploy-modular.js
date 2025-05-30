@@ -32,7 +32,10 @@ const NETWORK_CONFIG = {
         },
         defaultRepaymentAsset: process.env.CHIADO_DEFAULT_ASSET || "WXDAI",
         useMock: false
-    },
+    }
+    // GNOSIS MAINNET - DÉSACTIVÉ PAR DÉFAUT POUR ÉVITER LES DÉPLOIEMENTS ACCIDENTELS
+    // Pour activer, décommentez la section ci-dessous et configurez vos variables d'environnement
+    /*
     gnosis: {
         name: "Gnosis Mainnet",
         rmmAddress: process.env.GNOSIS_RMM_PROXY || "0xFb9b496519fCa8473fba1af0850B6B8F476BFdB3",
@@ -43,6 +46,7 @@ const NETWORK_CONFIG = {
         defaultRepaymentAsset: process.env.GNOSIS_DEFAULT_ASSET || "WXDAI",
         useMock: false
     }
+    */
 };
 
 async function deployMockContracts() {
@@ -168,7 +172,7 @@ async function main() {
     console.log(`📍 Rent2Repay: ${contractAddress}`);
     console.log(`🏦 RMM: ${rmmAddress}`);
     console.log(`💰 Asset de remboursement: ${config.defaultRepaymentAsset} (${repaymentAsset})`);
-    console.log(`\n�� Assets supportés:`);
+    console.log(`\nAssets supportés:`);
     console.log(`   • WXDAI: ${supportedAssets.WXDAI}`);
     console.log(`   • USDC: ${supportedAssets.USDC}`);
 

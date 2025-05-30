@@ -27,16 +27,11 @@ module.exports = {
       url: process.env.CHIADO_RPC_URL || "https://rpc.chiadochain.net",
       chainId: 10200,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
-    },
-    gnosis: {
-      url: process.env.GNOSIS_RPC_URL || "https://rpc.gnosischain.com",
-      chainId: 100,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     }
   },
   etherscan: {
     apiKey: {
-      gnosis: process.env.GNOSISSCAN_API_KEY || "",
+      // gnosis: process.env.GNOSISSCAN_API_KEY || "",
       chiado: process.env.GNOSISSCAN_API_KEY || ""
     },
     customChains: [

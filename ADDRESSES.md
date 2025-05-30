@@ -2,6 +2,8 @@
 
 ## 🌐 Gnosis Mainnet (Chain ID: 100)
 
+⚠️ **CONFIGURATION DÉSACTIVÉE PAR DÉFAUT** - Pour éviter les déploiements accidentels sur le mainnet.
+
 ### RMM (Risk Management Module)
 - **Proxy**: `0xFb9b496519fCa8473fba1af0850B6B8F476BFdB3`
 - **Version**: `0x5ad7501426e6e777B331Bd8cb077F7a35Bf2E211`
@@ -15,7 +17,7 @@
 - **Debt USDC**: `0x69c731aE5f5356a779f44C355aBB685d84e5E9e6`
 
 ### Rent2Repay Contract
-- **Address**: `TBD - à déployer`
+- **Address**: `TBD - à déployer (configuration désactivée)`
 
 ---
 

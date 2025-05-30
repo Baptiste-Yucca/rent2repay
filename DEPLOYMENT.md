@@ -55,7 +55,15 @@ npx hardhat run scripts/deploy-modular.js --network chiado
 
 ### Gnosis Mainnet
 
+⚠️ **DÉSACTIVÉ PAR DÉFAUT** pour éviter les déploiements accidentels.
+
+Pour activer le déploiement sur Gnosis mainnet :
+1. Décommentez la configuration dans `scripts/deploy-modular.js`
+2. Décommentez la configuration dans `hardhat.config.js`
+3. Configurez vos variables d'environnement
+
 ```bash
+# UNIQUEMENT SI VOUS VOULEZ DÉPLOYER SUR MAINNET
 npx hardhat run scripts/deploy-modular.js --network gnosis
 ```
 
