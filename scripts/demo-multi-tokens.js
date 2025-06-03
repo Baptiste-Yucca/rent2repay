@@ -39,14 +39,14 @@ async function demonstrateMultiTokenApproach() {
     console.log("👥 CONFIGURATION DES UTILISATEURS:");
 
     // Alice configure 100 WXDAI et 200 USDC par semaine
-    await rent2repay.connect(alice).configureRent2Repay(await wxdai.getAddress(), ethers.parseEther("100"));
-    await rent2repay.connect(alice).configureRent2Repay(await usdc.getAddress(), ethers.parseUnits("200", 6));
+    await rent2repay.connect(alice).configureRent2Repay([await wxdai.getAddress()], [ethers.parseEther("100")]);
+    await rent2repay.connect(alice).configureRent2Repay([await usdc.getAddress()], [ethers.parseUnits("200", 6)]);
     console.log("✅ Alice: 100 WXDAI + 200 USDC par semaine");
 
     // Bob utilise la configuration batch: 50 WXDAI et 75 USDC
     const tokens = [await wxdai.getAddress(), await usdc.getAddress()];
     const amounts = [ethers.parseEther("50"), ethers.parseUnits("75", 6)];
-    await rent2repay.connect(bob).configureRent2RepayMultiple(tokens, amounts);
+    await rent2repay.connect(bob).configureRent2Repay(tokens, amounts);
     console.log("✅ Bob: 50 WXDAI + 75 USDC par semaine (config batch)\n");
 
     // Simulation de remboursements

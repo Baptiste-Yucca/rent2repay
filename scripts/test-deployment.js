@@ -62,7 +62,7 @@ async function main() {
         const weeklyAmount = ethers.parseEther("100");
 
         // User1 configure Rent2Repay
-        const tx1 = await rent2Repay.connect(user1).configureRent2Repay(weeklyAmount);
+        const tx1 = await rent2Repay.connect(user1).configureRent2Repay([weeklyAmount]);
         await tx1.wait();
 
         const isAuthorized = await rent2Repay.isAuthorized(user1.address);

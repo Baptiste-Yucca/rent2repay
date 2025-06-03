@@ -70,24 +70,21 @@ async function testLocalDeployment() {
     const wxdaiWeeklyLimit = ethers.parseEther("100"); // 100 WXDAI par semaine
     const usdcWeeklyLimit = ethers.parseUnits("150", 6); // 150 USDC par semaine
 
-    await rent2repay.connect(user).configureRent2Repay(supportedAssets.WXDAI, wxdaiWeeklyLimit);
-    await rent2repay.connect(user).configureRent2Repay(supportedAssets.USDC, usdcWeeklyLimit);
-    console.log("✅ Rent2Repay configuré pour WXDAI et USDC");
+    // User configure individuellement pour WXDAI et USDC
+    await rent2repay.connect(user).configureRent2Repay([supportedAssets.WXDAI], [wxdaiWeeklyLimit]);
+    await rent2repay.connect(user).configureRent2Repay([supportedAssets.USDC], [usdcWeeklyLimit]);
+    console.log("✅ User configuré individuellement pour les deux tokens");
 
-    // Vérifier les configurations
-    const wxdaiConfig = await rent2repay.getUserConfigForToken(user.address, supportedAssets.WXDAI);
-    const usdcConfig = await rent2repay.getUserConfigForToken(user.address, supportedAssets.USDC);
-    console.log(`   • Limite WXDAI: ${ethers.formatEther(wxdaiConfig[0])} WXDAI/semaine`);
-    console.log(`   • Limite USDC: ${ethers.formatUnits(usdcConfig[0], 6)} USDC/semaine`);
-    console.log(`   • Disponible WXDAI: ${ethers.formatEther(await rent2repay.getAvailableAmountThisWeek(user.address, supportedAssets.WXDAI))} WXDAI`);
-    console.log(`   • Disponible USDC: ${ethers.formatUnits(await rent2repay.getAvailableAmountThisWeek(user.address, supportedAssets.USDC), 6)} USDC`);
+    // Vérification des autorisations
+    const userIsAuthorized = await rent2repay.isAuthorized(user.address);
+    const userConfigs = await rent2repay.getUserConfigs(user.address);
+    console.log(`   • Autorisé: ${userIsAuthorized}`);
+    console.log(`   • Tokens configurés: ${userConfigs[0].length}`);
 
-    // Configuration par batch (User2)
-    console.log("\n🔄 ÉTAPE 6: Configuration par batch pour User2");
+    // User2 utilise la configuration batch
     const tokens = [supportedAssets.WXDAI, supportedAssets.USDC];
-    const amounts = [ethers.parseEther("50"), ethers.parseUnits("75", 6)];
-
-    await rent2repay.connect(user2).configureRent2RepayMultiple(tokens, amounts);
+    const amounts = [ethers.parseEther("75"), ethers.parseUnits("100", 6)];
+    await rent2repay.connect(user2).configureRent2Repay(tokens, amounts);
     console.log("✅ Configuration batch réussie pour User2");
 
     const user2Configs = await rent2repay.getUserConfigs(user2.address);

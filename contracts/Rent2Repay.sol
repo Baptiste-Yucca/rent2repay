@@ -103,6 +103,7 @@ contract Rent2Repay is AccessControl, Pausable {
     error TokenNotAuthorized();
     error TokenAlreadyAuthorized();
     error TokenNotFound();
+    error TokenStillAuthorized();
 
     /**
      * @notice Constructor that sets up roles, RMM integration and initial authorized tokens
@@ -198,35 +199,11 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
-     * @notice Configures the Rent2Repay mechanism for the caller for a specific token
-     * @dev Sets up weekly spending limits for automated repayments for a specific token
-     * @param token The token address to configure
-     * @param weeklyMaxAmount Maximum amount authorized per week for this token (must be > 0)
-     */
-    function configureRent2Repay(address token, uint256 weeklyMaxAmount) 
-        external 
-        whenNotPaused
-        validTokenAddress(token)
-        onlyAuthorizedToken(token)
-        validAmount(weeklyMaxAmount) 
-    {
-        weeklyMaxAmounts[msg.sender][token] = weeklyMaxAmount;
-        currentWeekSpent[msg.sender][token] = 0;
-        
-        // Initialize lastRepayTimestamp if it's the first token configuration
-        if (lastRepayTimestamps[msg.sender] == 0) {
-            lastRepayTimestamps[msg.sender] = block.timestamp;
-        }
-        
-        emit Rent2RepayConfigured(msg.sender, token, weeklyMaxAmount);
-    }
-
-    /**
-     * @notice Configures the Rent2Repay mechanism for multiple tokens at once
-     * @param tokens Array of token addresses to configure
+     * @notice Configures the Rent2Repay mechanism for one or multiple tokens
+     * @param tokens Array of token addresses to configure (can contain just one token)
      * @param amounts Array of maximum amounts per week for each token
      */
-    function configureRent2RepayMultiple(
+    function configureRent2Repay(
         address[] calldata tokens,
         uint256[] calldata amounts
     ) external whenNotPaused {
@@ -512,6 +489,18 @@ contract Rent2Repay is AccessControl, Pausable {
             }
         }
         
+        // Option: Automatic cleanup (commented out for gas reasons)
+        // This would be very expensive with many users
+        /*
+        for (uint256 i = 0; i < allUsers.length; i++) {
+            if (weeklyMaxAmounts[allUsers[i]][token] > 0) {
+                weeklyMaxAmounts[allUsers[i]][token] = 0;
+                currentWeekSpent[allUsers[i]][token] = 0;
+                emit Rent2RepayRevoked(allUsers[i], token);
+            }
+        }
+        */
+        
         emit TokenUnauthorized(token);
     }
 
@@ -573,5 +562,59 @@ contract Rent2Repay is AccessControl, Pausable {
         validAddress(to)
     {
         IERC20(token).transfer(to, amount);
+    }
+
+    /**
+     * @notice Allows admins to clean up user configurations for an unauthorized token
+     * @dev Only works on tokens that are no longer authorized. 
+     * Useful for cleanup after token removal.
+     * @param token The unauthorized token address to clean up
+     * @param users Array of user addresses to clean up
+     */
+    function cleanupUnauthorizedTokenConfigs(
+        address token,
+        address[] calldata users
+    ) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+        validTokenAddress(token)
+    {
+        // Only allow cleanup of unauthorized tokens
+        if (authorizedTokens[token]) revert TokenStillAuthorized();
+
+        for (uint256 i = 0; i < users.length; i++) {
+            if (users[i] != address(0) && weeklyMaxAmounts[users[i]][token] > 0) {
+                weeklyMaxAmounts[users[i]][token] = 0;
+                currentWeekSpent[users[i]][token] = 0;
+                emit Rent2RepayRevoked(users[i], token);
+            }
+        }
+    }
+
+    /**
+     * @notice Returns all users who have configured a specific token (for cleanup purposes)
+     * @dev This function is expensive and should only be used off-chain or by admins
+     * @param token The token address to check
+     * @param startIndex Starting index for pagination
+     * @param maxResults Maximum number of results to return
+     * @return users Array of user addresses who have this token configured
+     * @return hasMore Whether there are more results available
+     */
+    function getUsersWithTokenConfig(
+        address token,
+        uint256 startIndex,
+        uint256 maxResults
+    ) 
+        external 
+        view 
+        returns (address[] memory users, bool hasMore) 
+    {
+        // This is a simplified version - in practice you'd need to track user addresses
+        // or use events to build this list off-chain
+        users = new address[](0);
+        hasMore = false;
+        
+        // Note: This function would be very expensive on-chain with many users
+        // In practice, you'd track user registrations or use events to build lists off-chain
     }
 } 

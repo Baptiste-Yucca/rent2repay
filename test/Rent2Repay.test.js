@@ -122,8 +122,8 @@ describe("Rent2Repay Multi-Token", function () {
     describe("User Configuration - Single Token", function () {
         it("Should allow user to configure Rent2Repay for WXDAI", async function () {
             await expect(rent2Repay.connect(user).configureRent2Repay(
-                await wxdaiToken.getAddress(),
-                WEEKLY_AMOUNT_WXDAI
+                [await wxdaiToken.getAddress()],
+                [WEEKLY_AMOUNT_WXDAI]
             ))
                 .to.emit(rent2Repay, "Rent2RepayConfigured")
                 .withArgs(user.address, await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
@@ -138,8 +138,8 @@ describe("Rent2Repay Multi-Token", function () {
 
         it("Should allow user to configure Rent2Repay for USDC", async function () {
             await expect(rent2Repay.connect(user).configureRent2Repay(
-                await usdcToken.getAddress(),
-                WEEKLY_AMOUNT_USDC
+                [await usdcToken.getAddress()],
+                [WEEKLY_AMOUNT_USDC]
             ))
                 .to.emit(rent2Repay, "Rent2RepayConfigured")
                 .withArgs(user.address, await usdcToken.getAddress(), WEEKLY_AMOUNT_USDC);
@@ -153,15 +153,15 @@ describe("Rent2Repay Multi-Token", function () {
             await unauthorizedToken.waitForDeployment();
 
             await expect(rent2Repay.connect(user).configureRent2Repay(
-                await unauthorizedToken.getAddress(),
-                WEEKLY_AMOUNT_WXDAI
+                [await unauthorizedToken.getAddress()],
+                [WEEKLY_AMOUNT_WXDAI]
             )).to.be.revertedWithCustomError(rent2Repay, "TokenNotAuthorized");
         });
 
         it("Should not allow configuration with zero amount", async function () {
             await expect(rent2Repay.connect(user).configureRent2Repay(
-                await wxdaiToken.getAddress(),
-                0
+                [await wxdaiToken.getAddress()],
+                [0]
             )).to.be.revertedWithCustomError(rent2Repay, "AmountMustBeGreaterThanZero");
         });
 
@@ -169,8 +169,8 @@ describe("Rent2Repay Multi-Token", function () {
             await rent2Repay.connect(emergency).pause();
 
             await expect(rent2Repay.connect(user).configureRent2Repay(
-                await wxdaiToken.getAddress(),
-                WEEKLY_AMOUNT_WXDAI
+                [await wxdaiToken.getAddress()],
+                [WEEKLY_AMOUNT_WXDAI]
             )).to.be.revertedWithCustomError(rent2Repay, "EnforcedPause");
         });
     });
@@ -180,7 +180,7 @@ describe("Rent2Repay Multi-Token", function () {
             const tokens = [await wxdaiToken.getAddress(), await usdcToken.getAddress()];
             const amounts = [WEEKLY_AMOUNT_WXDAI, WEEKLY_AMOUNT_USDC];
 
-            await rent2Repay.connect(user).configureRent2RepayMultiple(tokens, amounts);
+            await rent2Repay.connect(user).configureRent2Repay(tokens, amounts);
 
             expect(await rent2Repay.isAuthorizedForToken(user.address, await wxdaiToken.getAddress())).to.be.true;
             expect(await rent2Repay.isAuthorizedForToken(user.address, await usdcToken.getAddress())).to.be.true;
@@ -196,7 +196,7 @@ describe("Rent2Repay Multi-Token", function () {
             const tokens = [await wxdaiToken.getAddress(), await usdcToken.getAddress()];
             const amounts = [WEEKLY_AMOUNT_WXDAI, WEEKLY_AMOUNT_USDC];
 
-            await rent2Repay.connect(user).configureRent2RepayMultiple(tokens, amounts);
+            await rent2Repay.connect(user).configureRent2Repay(tokens, amounts);
 
             const userConfigs = await rent2Repay.getUserConfigs(user.address);
             expect(userConfigs[0].length).to.equal(2); // tokens array
@@ -207,8 +207,8 @@ describe("Rent2Repay Multi-Token", function () {
 
     describe("User Revocation", function () {
         beforeEach(async function () {
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
-            await rent2Repay.connect(user).configureRent2Repay(await usdcToken.getAddress(), WEEKLY_AMOUNT_USDC);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
+            await rent2Repay.connect(user).configureRent2Repay([await usdcToken.getAddress()], [WEEKLY_AMOUNT_USDC]);
         });
 
         it("Should allow user to revoke authorization for specific token", async function () {
@@ -239,8 +239,8 @@ describe("Rent2Repay Multi-Token", function () {
 
     describe("Operator Functions", function () {
         beforeEach(async function () {
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
-            await rent2Repay.connect(user).configureRent2Repay(await usdcToken.getAddress(), WEEKLY_AMOUNT_USDC);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
+            await rent2Repay.connect(user).configureRent2Repay([await usdcToken.getAddress()], [WEEKLY_AMOUNT_USDC]);
         });
 
         it("Should allow operator to remove user (all tokens)", async function () {
@@ -298,7 +298,7 @@ describe("Rent2Repay Multi-Token", function () {
 
     describe("Repayment Validation - WXDAI", function () {
         beforeEach(async function () {
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
         });
 
         it("Should allow anyone to validate WXDAI repayment within limits", async function () {
@@ -327,7 +327,7 @@ describe("Rent2Repay Multi-Token", function () {
 
         it("Should track separate limits for different tokens", async function () {
             // Configure both tokens
-            await rent2Repay.connect(user).configureRent2Repay(await usdcToken.getAddress(), WEEKLY_AMOUNT_USDC);
+            await rent2Repay.connect(user).configureRent2Repay([await usdcToken.getAddress()], [WEEKLY_AMOUNT_USDC]);
 
             const wxdaiRepayAmount = ethers.parseEther("50");
             const usdcRepayAmount = ethers.parseUnits("75", 6);
@@ -476,8 +476,8 @@ describe("Rent2Repay Multi-Token", function () {
 
     describe("Weekly Reset Logic", function () {
         beforeEach(async function () {
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
-            await rent2Repay.connect(user).configureRent2Repay(await usdcToken.getAddress(), WEEKLY_AMOUNT_USDC);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
+            await rent2Repay.connect(user).configureRent2Repay([await usdcToken.getAddress()], [WEEKLY_AMOUNT_USDC]);
         });
 
         it("Should reset weekly counter after one week for all tokens", async function () {
@@ -524,7 +524,7 @@ describe("Rent2Repay Multi-Token", function () {
             expect(await rent2Repay.getAvailableAmountThisWeek(otherUser.address, await wxdaiToken.getAddress()))
                 .to.equal(0); // Not authorized
 
-            await rent2Repay.connect(otherUser).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
+            await rent2Repay.connect(otherUser).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
 
             expect(await rent2Repay.getAvailableAmountThisWeek(otherUser.address, await wxdaiToken.getAddress()))
                 .to.equal(WEEKLY_AMOUNT_WXDAI);
@@ -546,8 +546,8 @@ describe("Rent2Repay Multi-Token", function () {
 
     describe("View Functions", function () {
         beforeEach(async function () {
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
-            await rent2Repay.connect(user).configureRent2Repay(await usdcToken.getAddress(), WEEKLY_AMOUNT_USDC);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
+            await rent2Repay.connect(user).configureRent2Repay([await usdcToken.getAddress()], [WEEKLY_AMOUNT_USDC]);
         });
 
         it("Should return correct authorization status", async function () {
@@ -574,7 +574,7 @@ describe("Rent2Repay Multi-Token", function () {
 
     describe("Edge Cases", function () {
         it("Should handle reconfiguration after spending", async function () {
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
 
             // Make a repayment
             const repayAmount = ethers.parseEther("50");
@@ -587,7 +587,7 @@ describe("Rent2Repay Multi-Token", function () {
 
             // Reconfigure with higher limit
             const newLimit = ethers.parseEther("200");
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), newLimit);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [newLimit]);
 
             // Should be able to spend more now
             const additionalAmount = ethers.parseEther("120");
@@ -603,7 +603,7 @@ describe("Rent2Repay Multi-Token", function () {
         });
 
         it("Should handle operator removal after partial spending", async function () {
-            await rent2Repay.connect(user).configureRent2Repay(await wxdaiToken.getAddress(), WEEKLY_AMOUNT_WXDAI);
+            await rent2Repay.connect(user).configureRent2Repay([await wxdaiToken.getAddress()], [WEEKLY_AMOUNT_WXDAI]);
 
             // Make a repayment
             const repayAmount = ethers.parseEther("50");
