@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interface de Test - Rent2Repay</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.14.1/dist/ethers.umd.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🏠 Interface de Test Rent2Repay</h1>
+            <div class="network-info">
+                <span id="network-status" class="network-disconnected">Non connecté</span>
+                <button id="connect-wallet" class="btn btn-primary">Connecter Wallet</button>
+            </div>
+        </header>
+
+        <!-- Account Info -->
+        <section class="account-section" id="account-section" style="display: none;">
+            <div class="card">
+                <h2>🔗 Compte Connecté</h2>
+                <div class="account-info">
+                    <p><strong>Adresse:</strong> <span id="account-address"></span></p>
+                    <div class="token-balances">
+                        <div>
+                            <strong>ETH:</strong> <span id="eth-balance">0</span> ETH
+                        </div>
+                        <div>
+                            <strong>WXDAI:</strong> <span id="wxdai-balance">0</span> WXDAI
+                        </div>
+                        <div>
+                            <strong>USDC:</strong> <span id="usdc-balance">0</span> USDC
+                        </div>
+                        <div>
+                            <strong>debtWXDAI:</strong> <span id="debt-wxdai-balance">0</span> debtWXDAI
+                        </div>
+                        <div>
+                            <strong>debtUSDC:</strong> <span id="debt-usdc-balance">0</span> debtUSDC
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contract Info -->
+        <section class="contract-section">
+            <div class="card">
+                <h2>📋 Informations du Contrat</h2>
+                <div class="contract-info">
+                    <p><strong>Adresse Rent2Repay:</strong> <span id="contract-address">-</span></p>
+                    <p><strong>Adresse RMM:</strong> <span id="rmm-address">-</span></p>
+                    <p><strong>Statut:</strong> <span id="contract-status">-</span></p>
+                    <p><strong>Tokens autorisés:</strong> <span id="authorized-tokens">-</span></p>
+                </div>
+                <button id="refresh-contract-info" class="btn btn-secondary">🔄 Actualiser</button>
+            </div>
+        </section>
+
+        <!-- User Configuration -->
+        <section class="user-config-section" id="user-config-section" style="display: none;">
+            <div class="card">
+                <h2>⚙️ Configuration Utilisateur</h2>
+
+                <!-- Current Config Display -->
+                <div class="current-config">
+                    <h3>Configuration Actuelle</h3>
+                    <div id="current-user-config">
+                        <p>Aucune configuration trouvée</p>
+                    </div>
+                </div>
+
+                <!-- New Configuration Form -->
+                <div class="config-form">
+                    <h3>Nouvelle Configuration</h3>
+                    <form id="configure-form">
+                        <div class="form-group">
+                            <label for="token-select">Token:</label>
+                            <select id="token-select" required>
+                                <option value="">Sélectionner un token</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="weekly-limit">Limite Hebdomadaire:</label>
+                            <input type="number" id="weekly-limit" placeholder="Ex: 100" step="0.01" min="0" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">💾 Configurer</button>
+                    </form>
+                </div>
+
+                <!-- Multi-token Configuration -->
+                <div class="multi-config-form">
+                    <h3>Configuration Multi-Tokens</h3>
+                    <div id="multi-token-inputs">
+                        <!-- Inputs will be added dynamically -->
+                    </div>
+                    <button id="add-token-config" class="btn btn-secondary">+ Ajouter Token</button>
+                    <button id="configure-multi" class="btn btn-primary">💾 Configurer Tous</button>
+                </div>
+
+                <!-- Revocation -->
+                <div class="revocation-section">
+                    <h3>Révocation</h3>
+                    <div class="form-group">
+                        <label for="revoke-token-select">Token à révoquer:</label>
+                        <select id="revoke-token-select">
+                            <option value="">Sélectionner un token</option>
+                        </select>
+                        <button id="revoke-token" class="btn btn-warning">🚫 Révoquer Token</button>
+                    </div>
+                    <button id="revoke-all" class="btn btn-danger">🚫 Révoquer Tout</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Repayment Testing -->
+        <section class="repayment-section" id="repayment-section" style="display: none;">
+            <div class="card">
+                <h2>💰 Test de Remboursement</h2>
+
+                <div class="repayment-form">
+                    <form id="repayment-form">
+                        <div class="form-group">
+                            <label for="target-user">Adresse utilisateur cible:</label>
+                            <input type="text" id="target-user" placeholder="0x..." required>
+                            <button type="button" id="check-user" class="btn btn-secondary">🔍 Vérifier</button>
+                        </div>
+
+                        <div id="user-info" class="user-info" style="display: none;">
+                            <!-- User info will be displayed here -->
+                        </div>
+
+                        <div class="form-group">
+                            <label for="repay-token">Token de remboursement:</label>
+                            <select id="repay-token" required>
+                                <option value="">Sélectionner un token</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="repay-amount">Montant:</label>
+                            <input type="number" id="repay-amount" placeholder="Ex: 50" step="0.01" min="0" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">💸 Exécuter Remboursement</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Token Management -->
+        <section class="token-management-section" id="token-management-section" style="display: none;">
+            <div class="card">
+                <h2>🔧 Gestion des Tokens (Admin)</h2>
+
+                <div class="admin-functions">
+                    <div class="form-group">
+                        <label for="new-token-address">Nouvelle adresse token:</label>
+                        <input type="text" id="new-token-address" placeholder="0x...">
+                        <button id="authorize-token" class="btn btn-primary">✅ Autoriser</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="unauthorize-token-select">Token à désautoriser:</label>
+                        <select id="unauthorize-token-select">
+                            <option value="">Sélectionner un token</option>
+                        </select>
+                        <button id="unauthorize-token" class="btn btn-warning">❌ Désautoriser</button>
+                    </div>
+
+                    <div class="emergency-functions">
+                        <h3>🚨 Fonctions d'Urgence</h3>
+                        <button id="pause-contract" class="btn btn-warning">⏸️ Pause Contrat</button>
+                        <button id="unpause-contract" class="btn btn-success">▶️ Débloquer Contrat</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contrôles des Tokens Mock -->
+        <section class="mock-controls-section">
+            <div class="card">
+                <h2>🧪 Contrôles des Tokens Mock</h2>
+                <p>Mint ou burn des tokens pour vos tests</p>
+
+                <div class="form-group">
+                    <label for="mock-token-select">Token:</label>
+                    <select id="mock-token-select">
+                        <option value="">Sélectionner un token</option>
+                        <option value="WXDAI">WXDAI (Asset Token)</option>
+                        <option value="USDC">USDC (Asset Token)</option>
+                        <option value="DEBT_WXDAI">debtWXDAI (Debt Token)</option>
+                        <option value="DEBT_USDC">debtUSDC (Debt Token)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="mock-amount">Montant:</label>
+                    <input type="number" id="mock-amount" placeholder="1000" step="0.01" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label>Actions:</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" id="mint-tokens" class="btn btn-success">🪙 Mint Tokens</button>
+                        <button type="button" id="burn-tokens" class="btn btn-warning">🔥 Burn Tokens</button>
+                        <button type="button" id="approve-tokens" class="btn btn-primary">✅ Approuver pour
+                            Rent2Repay</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="approve-amount">Montant d'approbation:</label>
+                    <input type="number" id="approve-amount" placeholder="500" step="0.01" min="0">
+                </div>
+            </div>
+        </section>
+
+        <!-- Logs -->
+        <section class="logs-section">
+            <div class="card">
+                <h2>📝 Journaux d'Activité</h2>
+                <div class="logs-controls">
+                    <button id="clear-logs" class="btn btn-secondary">🗑️ Effacer</button>
+                </div>
+                <div id="logs" class="logs">
+                    <p class="log-entry">Interface initialisée</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p>Transaction en cours...</p>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

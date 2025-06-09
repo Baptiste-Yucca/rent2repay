@@ -78,7 +78,7 @@ async function deployMockContracts() {
     };
 }
 
-async function deployRent2Repay(rmmAddress, repaymentAsset) {
+async function deployRent2Repay(rmmAddress, supportedAssets) {
     console.log("🚀 Déploiement du contrat Rent2Repay...");
 
     const [deployer] = await ethers.getSigners();
@@ -95,7 +95,8 @@ async function deployRent2Repay(rmmAddress, repaymentAsset) {
         emergency,
         operator,
         rmmAddress,
-        repaymentAsset
+        supportedAssets.WXDAI,
+        supportedAssets.USDC
     );
 
     await rent2repay.waitForDeployment();
@@ -161,7 +162,7 @@ async function main() {
     console.log(`💰 Asset de remboursement sélectionné: ${config.defaultRepaymentAsset} (${repaymentAsset})`);
 
     // Déployer Rent2Repay
-    const rent2repay = await deployRent2Repay(rmmAddress, repaymentAsset);
+    const rent2repay = await deployRent2Repay(rmmAddress, supportedAssets);
     const contractAddress = await rent2repay.getAddress();
     const [deployer] = await ethers.getSigners();
 
@@ -184,7 +185,8 @@ async function main() {
             deployer.address, // emergency
             deployer.address, // operator
             rmmAddress,
-            repaymentAsset
+            supportedAssets.WXDAI,
+            supportedAssets.USDC
         ]);
     }
 
