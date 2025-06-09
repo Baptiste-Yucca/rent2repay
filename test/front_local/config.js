@@ -8,15 +8,16 @@ window.CONFIG = {
         symbol: 'ETH'
     },
 
-    // Adresses des contrats (mises à jour avec le déploiement récent)
+    // Adresses des contrats (à mettre à jour après déploiement)
+    // ⚠️ CES ADRESSES CHANGENT À CHAQUE REDÉMARRAGE DE HARDHAT
+    // Déployez d'abord avec: npx hardhat run test/front_local/deploy-simple.js --network localhost
     CONTRACTS: {
-        RENT2REPAY: "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-        RMM: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-        WXDAI: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-        USDC: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-        // Tokens de dette (localhost)
-        DEBT_WXDAI: "0x95401dc811bb5740090279Ba06cfA8fcF6113778",
-        DEBT_USDC: "0x998abeb3E57409262aE5b751f60747921B33613E"
+        RENT2REPAY: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9", // À définir après déploiement
+        RMM: "0x5FbDB2315678afecb367f032d93F642f64180aa3",        // À définir après déploiement
+        WXDAI: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",      // À définir après déploiement
+        USDC: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",       // À définir après déploiement
+        DEBT_WXDAI: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9", // À définir après déploiement
+        DEBT_USDC: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"   // À définir après déploiement
     },
 
     // ABI des contrats (versions simplifiées pour les fonctions utilisées)
@@ -81,32 +82,34 @@ window.CONFIG = {
         ]
     },
 
-    // Adresses des tokens connus (mise à jour avec le déploiement récent)
+    // Adresses des tokens connus (correspondance Gnosis ↔ Localhost)
     TOKENS: {
         WXDAI: {
-            address: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+            address: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9", // localhost fixe
+            // Gnosis: "0xe91d153e0b41518a2ce8dd3d7944fa863463a97d"
             symbol: 'WXDAI',
             name: 'Wrapped xDAI',
             decimals: 18
         },
         USDC: {
-            address: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+            address: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707", // localhost fixe
+            // Gnosis: "0xddafbb505ad214d7b80b1f830fccc89b60fb7a83" 
             symbol: 'USDC',
             name: 'USD Coin',
             decimals: 18 // Mock USDC utilise 18 décimales pour simplifier
         },
         // Tokens de dette correspondants
         DEBT_WXDAI: {
-            address: "0x95401dc811bb5740090279Ba06cfA8fcF6113778", // localhost
-            // Gnosis address: "0x9908801dF7902675C3FEDD6Fea0294D18D5d5d34"
+            address: "0x09635F643e140090A9A8Dcd712eD6285858ceBef", // localhost fixe
+            gnosis: "0x9908801dF7902675C3FEDD6Fea0294D18D5d5d34",     // adresse Gnosis réelle
             symbol: 'debtWXDAI',
             name: 'Debt Token WXDAI',
             decimals: 18,
             parentToken: 'WXDAI'
         },
         DEBT_USDC: {
-            address: "0x998abeb3E57409262aE5b751f60747921B33613E", // localhost
-            // Gnosis address: "0x69c731aE5f5356a779f44C355aBB685d84e5E9e6"
+            address: "0xc5a5C42992dECbae36851359345FE25997F5C42d", // localhost fixe
+            gnosis: "0x69c731aE5f5356a779f44C355aBB685d84e5E9e6",     // adresse Gnosis réelle
             symbol: 'debtUSDC',
             name: 'Debt Token USDC',
             decimals: 18,

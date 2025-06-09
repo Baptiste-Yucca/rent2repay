@@ -322,26 +322,16 @@ class Rent2RepayApp {
     }
 
     async detectContractAddresses() {
-        // Si pas d'adresses configurées, essayer de les détecter
-        if (!CONFIG.CONTRACTS.RENT2REPAY) {
-            // Option 1: Lire depuis localStorage (si sauvegardé après déploiement)
-            const savedAddresses = localStorage.getItem('rent2repay-addresses');
-            if (savedAddresses) {
-                const addresses = JSON.parse(savedAddresses);
-                CONFIG.CONTRACTS = { ...CONFIG.CONTRACTS, ...addresses };
-                this.log('Adresses chargées depuis le cache local', 'success');
-                return;
-            }
+        // Version simple : utiliser les adresses de config.js directement
+        // Pas de popup, pas de détection complexe, juste utiliser ce qui est configuré
 
-            // Option 2: Demander à l'utilisateur
-            const rent2repayAddress = prompt('Veuillez entrer l\'adresse du contrat Rent2Repay déployé:\n\n(Astuce: Déployez d\'abord avec: npx hardhat run scripts/deploy-modular.js --network localhost)');
-            if (rent2repayAddress && ethers.isAddress(rent2repayAddress)) {
-                CONFIG.CONTRACTS.RENT2REPAY = rent2repayAddress;
-                this.log('Adresse Rent2Repay définie manuellement', 'success');
-            } else {
-                throw new Error('Adresse Rent2Repay invalide ou non fournie');
-            }
+        if (!CONFIG.CONTRACTS.RENT2REPAY) {
+            this.log('⚠️ Adresses des contrats non définies dans config.js', 'warning');
+            this.log('💡 Déployez d\'abord avec: npx hardhat run test/front_local/deploy-fixed-addresses.js --network localhost', 'info');
+            throw new Error('Contrats non déployés - Veuillez déployer d\'abord');
         }
+
+        this.log('✅ Configuration chargée depuis config.js', 'success');
     }
 
     async initializeContracts() {
@@ -356,46 +346,33 @@ class Rent2RepayApp {
             this.signer
         );
 
-        // Obtenir les adresses des tokens autorisés
-        const authorizedTokens = await this.contracts.rent2repay.getAuthorizedTokens();
+        // Initialiser tous les contrats de tokens avec les adresses fixes
+        this.contracts.wxdai = new ethers.Contract(
+            CONFIG.CONTRACTS.WXDAI,
+            CONFIG.ABI.ERC20,
+            this.signer
+        );
 
-        // Initialiser les contrats de tokens
-        for (const tokenAddr of authorizedTokens) {
-            const tokenContract = new ethers.Contract(tokenAddr, CONFIG.ABI.ERC20, this.signer);
-            const symbol = await tokenContract.symbol();
-
-            if (symbol === 'WXDAI') {
-                this.contracts.wxdai = tokenContract;
-                CONFIG.CONTRACTS.WXDAI = tokenAddr;
-                CONFIG.TOKENS.WXDAI.address = tokenAddr;
-            } else if (symbol === 'USDC') {
-                this.contracts.usdc = tokenContract;
-                CONFIG.CONTRACTS.USDC = tokenAddr;
-                CONFIG.TOKENS.USDC.address = tokenAddr;
-            }
-        }
+        this.contracts.usdc = new ethers.Contract(
+            CONFIG.CONTRACTS.USDC,
+            CONFIG.ABI.ERC20,
+            this.signer
+        );
 
         // Initialiser les contrats de tokens de dette
-        try {
-            this.contracts.debtWxdai = new ethers.Contract(
-                CONFIG.CONTRACTS.DEBT_WXDAI,
-                CONFIG.ABI.ERC20,
-                this.signer
-            );
+        this.contracts.debtWxdai = new ethers.Contract(
+            CONFIG.CONTRACTS.DEBT_WXDAI,
+            CONFIG.ABI.ERC20,
+            this.signer
+        );
 
-            this.contracts.debtUsdc = new ethers.Contract(
-                CONFIG.CONTRACTS.DEBT_USDC,
-                CONFIG.ABI.ERC20,
-                this.signer
-            );
+        this.contracts.debtUsdc = new ethers.Contract(
+            CONFIG.CONTRACTS.DEBT_USDC,
+            CONFIG.ABI.ERC20,
+            this.signer
+        );
 
-            this.log('Contrats de tokens de dette initialisés', 'success');
-        } catch (error) {
-            this.log(`Erreur initialisation tokens de dette: ${error.message}`, 'warning');
-        }
-
-        // Sauvegarder les adresses
-        localStorage.setItem('rent2repay-addresses', JSON.stringify(CONFIG.CONTRACTS));
+        this.log('✅ Tous les contrats initialisés avec adresses fixes', 'success');
     }
 
     async updateTokenDropdowns(authorizedTokens) {
@@ -403,25 +380,37 @@ class Rent2RepayApp {
             'token-select',
             'revoke-token-select',
             'repay-token',
-            'unauthorize-token-select',
-            'mint-token-select'
+            'unauthorize-token-select'
+        ];
+
+        // Tokens connus (WXDAI et USDC sont toujours autorisés après déploiement)
+        const knownTokens = [
+            { address: CONFIG.CONTRACTS.WXDAI, symbol: 'WXDAI' },
+            { address: CONFIG.CONTRACTS.USDC, symbol: 'USDC' }
         ];
 
         for (const selectId of selects) {
             const select = document.getElementById(selectId);
             select.innerHTML = '<option value="">Sélectionner un token</option>';
 
-            for (const tokenAddr of authorizedTokens) {
-                try {
-                    const tokenContract = new ethers.Contract(tokenAddr, CONFIG.ABI.ERC20, this.signer);
-                    const symbol = await tokenContract.symbol();
-                    const option = document.createElement('option');
-                    option.value = tokenAddr;
-                    option.textContent = `${symbol} (${formatAddress(tokenAddr)})`;
-                    select.appendChild(option);
-                } catch (error) {
-                    // Token contract invalide, ignorer
-                }
+            // Ajouter les tokens connus
+            for (const token of knownTokens) {
+                const option = document.createElement('option');
+                option.value = token.address;
+                option.textContent = `${token.symbol} (${formatAddress(token.address)})`;
+                select.appendChild(option);
+            }
+        }
+
+        // Aussi remplir le select pour les tokens mock
+        const mockSelect = document.getElementById('mint-token-select');
+        if (mockSelect) {
+            mockSelect.innerHTML = '<option value="">Sélectionner un token</option>';
+            for (const token of knownTokens) {
+                const option = document.createElement('option');
+                option.value = token.address;
+                option.textContent = `${token.symbol} (${formatAddress(token.address)})`;
+                mockSelect.appendChild(option);
             }
         }
     }
