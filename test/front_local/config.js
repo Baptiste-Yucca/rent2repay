@@ -12,12 +12,12 @@ window.CONFIG = {
     // ⚠️ CES ADRESSES CHANGENT À CHAQUE REDÉMARRAGE DE HARDHAT
     // Déployez d'abord avec: npx hardhat run test/front_local/deploy-simple.js --network localhost
     CONTRACTS: {
-        RENT2REPAY: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9", // À définir après déploiement
-        RMM: "0x5FbDB2315678afecb367f032d93F642f64180aa3",        // À définir après déploiement
-        WXDAI: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",      // À définir après déploiement
-        USDC: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",       // À définir après déploiement
-        DEBT_WXDAI: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9", // À définir après déploiement
-        DEBT_USDC: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"   // À définir après déploiement
+        RENT2REPAY: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        RMM: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        WXDAI: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        USDC: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        DEBT_WXDAI: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+        DEBT_USDC: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
 
     // ABI des contrats (versions simplifiées pour les fonctions utilisées)

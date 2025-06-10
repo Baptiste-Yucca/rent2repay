@@ -353,7 +353,7 @@ contract Rent2Repay is AccessControl, Pausable {
         require(newSpentAmount >= currentWeekSpent[user][token], "Overflow protection");
 
         // Transfer and approve tokens for RMM
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        IERC20(token).transferFrom(user, address(this), amount);
         IERC20(token).approve(address(rmm), amount);
 
         // Call RMM repay function

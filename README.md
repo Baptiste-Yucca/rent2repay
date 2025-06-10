@@ -1,50 +1,120 @@
-# Rent2Repay
+# Rent2Repay - Système de Remboursement Automatique
 
-Un système de remboursement automatique de dettes pour le protocole RMM (fork d'Aave) sur Gnosis Chain.
+🏠 **Rent2Repay** permet aux utilisateurs de configurer des remboursements automatiques de leurs dettes avec leurs tokens ERC20, directement depuis leur loyer.
 
-## 📋 Description
+## 🚀 Démarrage Rapide
 
-Rent2Repay permet aux utilisateurs d'autoriser des remboursements automatiques de leurs dettes sur le protocole RMM avec des limites hebdomadaires configurables. Le système utilise la fonction `repay` du protocole RMM pour effectuer les remboursements de manière sécurisée.
-
-## 🏗️ Architecture
-
-### Smart Contracts
-
-#### `Rent2RepayAuthorizer.sol`
-Contrat principal qui gère les autorisations et les limites de remboursement :
-
-- **Structure `UserConfig`** :
-  - `weeklyMaxAmount` : Montant maximum autorisé par semaine
-  - `lastRepayTimestamp` : Timestamp du dernier remboursement
-  - `currentWeekSpent` : Montant déjà remboursé cette semaine
-
-- **Fonctions principales** :
-  - `configureRent2Repay(uint256 weeklyMaxAmount)` : Configure l'autorisation avec un montant hebdomadaire
-  - `revokeRent2Repay()` : Révoque l'autorisation
-  - `validateAndUpdateRepayment(address user, uint256 amount)` : Valide et met à jour les limites
-  - `getAvailableAmountThisWeek(address user)` : Retourne le montant disponible
-  - `isAuthorized(address user)` : Vérifie si un utilisateur est autorisé
-
-## 🌐 Protocole RMM
-
-### Assets supportés sur Gnosis Chain
-- **WXDAI** : `0xe91d153e0b41518a2ce8dd3d7944fa863463a97d`
-- **USDC** : `0xddafbb505ad214d7b80b1f830fccc89b60fb7a83`
-
-### Paramètres de remboursement
-- **interestRateMode** : 2 (mode variable uniquement)
-- **onBehalfOf** : Adresse de l'emprunteur à rembourser
-
-## 🚀 Installation
-
+### 1. Installation
 ```bash
-# Cloner le repository
-git clone <repository-url>
-cd rent2repay
-
-# Installer les dépendances
 npm install
 ```
+
+### 2. Lancement du Système Complet
+```bash
+# Terminal 1 - Lancer le node local
+npx hardhat node
+
+# Terminal 2 - Déployer les contrats et configurer
+npx hardhat run test/front_local/deploy-complete-auto.js --network localhost
+
+# Terminal 3 - Lancer l'interface web
+cd test/front_local
+python3 -m http.server 8000
+# Ou avec Node.js : npx serve .
+```
+
+### 3. Accès à l'Interface
+Ouvrir : http://localhost:8000
+
+## 📋 Adresses Déployées
+
+Les adresses sont automatiquement mises à jour dans `config.js` et `test/front_local/config.js` :
+
+- **Rent2Repay** : Contrat principal
+- **MockRMM** : Mock du Risk Management Module
+- **WXDAI/USDC** : Tokens de test
+- **debtWXDAI/debtUSDC** : Tokens de dette (pour l'interface)
+
+## 🔧 Scripts Utiles
+
+### Vérification d'un wallet
+```bash
+cd test/front_local
+node check-script.js 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+```
+
+### Mint et approve des tokens
+```bash
+# Mint + approve pour un utilisateur
+node token-script.js 3 100 WXDAI 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+node token-script.js 3 100 USDC 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+```
+
+### Configuration des dettes (pour les tests)
+```javascript
+// Créer set-debt.js dans test/front_local/
+const ethers = require('ethers');
+const config = require('./config.js');
+
+async function setDebt() {
+    const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+    const deployerKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    const deployer = new ethers.Wallet(deployerKey, provider);
+    
+    const mockRMM = new ethers.Contract(config.CONTRACTS.RMM, [
+        'function setDebt(address borrower, address asset, uint256 amount)'
+    ], deployer);
+    
+    const user1 = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+    const debtAmount = ethers.parseUnits('1000', 18);
+    
+    await mockRMM.setDebt(user1, config.CONTRACTS.WXDAI, debtAmount);
+    await mockRMM.setDebt(user1, config.CONTRACTS.USDC, debtAmount);
+    
+    console.log('✅ Dettes configurées');
+}
+
+setDebt().catch(console.error);
+```
+
+### Test de remboursement
+```bash
+# Remboursement de 25 tokens par l'admin pour User1
+node repay-script.js 25 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+```
+
+## 👤 Comptes de Test
+
+| Adresse | Clé Privée | Rôle |
+|---------|------------|------|
+| `0xf39F...2266` | `0xac09...f80` | Admin/Deployer |
+| `0x7099...79C8` | `0x59c6...90d` | User1 (Pré-configuré) |
+| `0x3C44...93BC` | `0x5de4...65a` | User2 |
+
+## 🔄 Fonctionnement
+
+1. **User1** configure ses limites hebdomadaires via l'interface ou :
+   ```javascript
+   rent2repay.configureRent2Repay([wxdai, usdc], [limite_wxdai, limite_usdc])
+   ```
+
+2. **User1** donne des allowances à Rent2Repay pour ses tokens
+
+3. **N'importe qui** peut déclencher un remboursement :
+   ```javascript
+   rent2repay.rent2repay(user1, token, montant)
+   ```
+
+4. Le système vérifie les limites et rembourse automatiquement via le RMM
+
+## 🎯 Interface Web
+
+L'interface permet de :
+- ✅ Visualiser les balances et allowances
+- ✅ Configurer les limites de remboursement
+- ✅ Tester les remboursements
+- ✅ Gérer les tokens (mint/approve)
+- ✅ Voir l'historique des transactions
 
 ## 🛠️ Développement
 
@@ -58,247 +128,36 @@ npx hardhat compile
 npx hardhat test
 ```
 
-### Déploiement local
-
-1. **Démarrer un nœud Hardhat local** :
+### Nettoyage
 ```bash
-npx hardhat node
+# Redémarrer tout
+pkill -f "npx hardhat node"
+rm -rf cache/ artifacts/
+npx hardhat clean
 ```
 
-2. **Déployer les contrats** :
-```bash
-npx hardhat run scripts/deploy-rent2repay.js --network localhost
-```
+## 📁 Structure du Projet
 
-### Scripts disponibles
-
-- `scripts/deploy-rent2repay.js` : Déploie et teste le contrat Rent2RepayAuthorizer
-
-## 📊 Tests
-
-Le projet inclut une suite de tests complète couvrant :
-
-### Configuration
-- ✅ Configuration avec montant valide
-- ✅ Rejet de configuration avec montant zéro
-- ✅ Reconfiguration avec montant différent
-- ✅ Révocation d'autorisation
-- ✅ Rejet de révocation non autorisée
-
-### Limites hebdomadaires
-- ✅ Montant complet disponible pour nouvel utilisateur
-- ✅ Validation et mise à jour dans les limites
-- ✅ Rejet de remboursement dépassant la limite
-- ✅ Rejet pour utilisateur non autorisé
-
-## 🔧 Configuration
-
-### Hardhat
-Le projet utilise Hardhat avec la configuration suivante :
-- Solidity version : `^0.8.20`
-- Network par défaut : Hardhat local
-- Tests : Mocha + Chai
-
-### Structure du projet
 ```
 rent2repay/
-├── contracts/
-│   ├── Rent2RepayAuthorizer.sol
-│   └── mocks/
-├── test/
-│   └── Rent2RepayAuthorizer.test.js
-├── scripts/
-│   └── deploy-rent2repay.js
-├── src_RMM/
-│   ├── RMM_code.sol
-│   └── RMM_ABI.json
-└── README.md
+├── contracts/           # Contrats Solidity
+├── test/               # Tests
+│   └── front_local/    # Interface web et scripts
+├── scripts/            # Scripts de déploiement
+├── config.js           # Adresses des contrats
+└── README.md           # Ce fichier
 ```
 
-## 🔐 Sécurité
+## 🔍 Troubleshooting
 
-### Fonctionnalités de sécurité
-- **Limites hebdomadaires** : Protection contre les remboursements excessifs
-- **Autorisation explicite** : Les utilisateurs doivent explicitement autoriser le système
-- **Validation des montants** : Vérification que les montants sont > 0
-- **Reset automatique** : Les limites se remettent à zéro chaque semaine
+### "Insufficient debt to repay"
+Configurer des dettes dans MockRMM avec le script set-debt.js
 
-### Bonnes pratiques
-- Utilisation de `require()` pour les validations
-- Émission d'événements pour la traçabilité
-- Structure de données optimisée (une seule map)
+### "Allowance insuffisante"
+Utiliser le script token avec l'action 3 (mint+approve)
 
-## 📈 Fonctionnement
+### Adresses changent à chaque restart
+Normal avec Hardhat. Relancer le deploy-complete-auto.js
 
-1. **Configuration** : L'utilisateur configure son autorisation avec `configureRent2Repay(montant)`
-2. **Validation** : Avant chaque remboursement, `validateAndUpdateRepayment()` vérifie les limites
-3. **Remboursement** : Si validé, le remboursement est effectué via la fonction `repay` du RMM
-4. **Suivi** : Le système met à jour automatiquement les montants dépensés
-
-## 🔮 Roadmap
-
-### Phase 1 (Actuelle)
-- ✅ Contrat d'autorisation avec limites hebdomadaires
-- ✅ Tests unitaires complets
-- ✅ Scripts de déploiement
-
-### Phase 2 (À venir)
-- 🔄 Contrat de remboursement automatique
-- 🔄 Intégration avec le protocole RMM
-- 🔄 Interface utilisateur (frontend)
-
-### Phase 3 (Futur)
-- 🔄 Système de proxy pour les upgrades
-- 🔄 Support de tokens supplémentaires
-- 🔄 Intégration avec Rabby Wallet
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! Veuillez :
-1. Fork le projet
-2. Créer une branche pour votre feature
-3. Ajouter des tests pour vos modifications
-4. Soumettre une Pull Request
-
-## 📄 License
-
-Ce projet est sous licence MIT.
-
-## 📞 Contact
-
-Pour toute question ou suggestion, n'hésitez pas à ouvrir une issue sur GitHub.
-
-## Configuration de l'environnement de développement
-
-### Extensions VSCode recommandées
-
-Pour une meilleure expérience de développement Solidity, installez ces extensions dans VSCode :
-
-1. **Hardhat for Visual Studio Code** (`nomicfoundation.hardhat-solidity`)
-   - Syntaxe highlighting optimisée pour Solidity
-   - Intégration avec Hardhat
-   - Auto-completion intelligente
-
-2. **Solidity** (`juanblanco.solidity`)
-   - Support complet de Solidity
-   - Compilation en temps réel
-   - Détection d'erreurs
-
-3. **Solidity Visual Auditor** (`tintinweb.solidity-visual-auditor`)
-   - Coloration syntaxique avancée
-   - Détection de vulnérabilités
-   - Analyse de sécurité visuelle
-
-4. **Slither VSCode** (`trailofbits.slither-vscode`)
-   - Analyse statique de sécurité
-   - Détection d'erreurs communes
-
-### Installation rapide
-
-```bash
-# Installer les dépendances
-npm install
-
-# Formater le code
-npm run format
-
-# Vérifier le style de code
-npm run lint
-
-# Compiler les contrats
-npm run compile
-
-# Lancer les tests
-npm test
-
-# Générer la documentation
-npm run docs
-```
-
-### Scripts disponibles
-
-- `npm run format` - Formate automatiquement le code Solidity
-- `npm run format:check` - Vérifie si le code est bien formaté
-- `npm run lint` - Analyse le code pour détecter les problèmes
-- `npm run lint:fix` - Corrige automatiquement les problèmes de style
-- `npm test` - Lance les tests
-- `npm run compile` - Compile les contrats
-- `npm run docs` - Génère la documentation à partir des commentaires NatSpec
-
-## Structure du projet
-
-```
-contracts/
-├── Rent2RepayAuthorizer.sol    # Contrat principal d'autorisation
-└── mocks/                      # Contrats de test
-    ├── MockERC20.sol
-    └── MockRMM.sol
-
-test/
-└── Rent2RepayAuthorizer.test.js # Tests du contrat principal
-
-docs/                           # Documentation générée automatiquement
-```
-
-## Fonctionnalités principales
-
-### Rent2RepayAuthorizer
-
-Le contrat principal permet aux utilisateurs de :
-
-- ✅ Configurer des limites hebdomadaires de remboursement
-- ✅ Révoquer leur autorisation à tout moment
-- ✅ Suivre leurs dépenses par semaine
-- ✅ Validation automatique des limites avant remboursement
-
-### Optimisations
-
-- **Erreurs personnalisées** au lieu de `require()` pour économiser du gas
-- **Mappings séparés** au lieu de structures pour la compatibilité avec les upgrades
-- **Modificateurs réutilisables** pour la validation
-- **Documentation NatSpec complète** pour la génération automatique de docs
-
-## Configuration VSCode
-
-Le projet inclut des configurations VSCode optimisées dans `.vscode/` :
-
-- `settings.json` - Paramètres pour Solidity
-- `extensions.json` - Extensions recommandées
-
-### Thème recommandé
-
-Pour une meilleure lisibilité du code Solidity, utilisez un thème sombre comme :
-- **One Dark Pro**
-- **Material Theme**
-- **Dracula Official**
-
-## Amélioration de la lisibilité
-
-Le code utilise :
-
-- 🎨 **Syntaxe highlighting** avec les extensions VSCode
-- 📏 **Formatage automatique** avec Prettier
-- 🔍 **Linting** avec Solhint
-- 📖 **Documentation NatSpec** en anglais
-- 🏗️ **Structure claire** avec mappings séparés
-- ⚡ **Erreurs personnalisées** plus lisibles
-
-## Tests
-
-```bash
-# Lancer tous les tests
-npm test
-
-# Tests avec couverture (si configuré)
-npx hardhat coverage
-```
-
-## Documentation
-
-La documentation est générée automatiquement à partir des commentaires NatSpec :
-
-```bash
-npm run docs
-```
-
-La documentation sera disponible dans le dossier `docs/`.
+### Interface ne se connecte pas
+Vérifier que le node local est bien lancé sur le port 8545
