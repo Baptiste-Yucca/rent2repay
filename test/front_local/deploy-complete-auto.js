@@ -6,6 +6,19 @@ async function main() {
     console.log("🚀 DÉPLOIEMENT COMPLET AUTOMATIQUE");
     console.log("=".repeat(50));
 
+    // Se connecter explicitement au nœud localhost
+    const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
+
+    // Vérifier la connexion
+    try {
+        const blockNumber = await provider.getBlockNumber();
+        console.log(`🔗 Connexion au nœud localhost: bloc ${blockNumber}`);
+    } catch (error) {
+        console.log("❌ Impossible de se connecter au nœud Hardhat!");
+        console.log("💡 Lancez d'abord: npx hardhat node");
+        process.exit(1);
+    }
+
     const [deployer, user1, user2, user3] = await ethers.getSigners();
     console.log(`👤 Déployeur: ${deployer.address}`);
     console.log(`👤 User1 (sera configuré): ${user1.address}`);
@@ -108,7 +121,21 @@ async function main() {
     console.log("\n🔄 7. Mise à jour config.js...");
     updateConfig(deployedAddresses);
 
-    // 8. Résumé final
+    // 8. Vérification de connectivité
+    console.log("\n🔍 8. Vérification de connectivité...");
+    try {
+        const wxdaiSymbol = await wxdai.symbol();
+        const usdcSymbol = await usdc.symbol();
+        console.log(`✅ WXDAI accessible: ${wxdaiSymbol}`);
+        console.log(`✅ USDC accessible: ${usdcSymbol}`);
+
+        const finalBlockNumber = await provider.getBlockNumber();
+        console.log(`✅ Déploiement terminé au bloc: ${finalBlockNumber}`);
+    } catch (error) {
+        console.log(`⚠️  Problème de vérification: ${error.message}`);
+    }
+
+    // 9. Résumé final
     console.log("\n📋 RÉSUMÉ DU DÉPLOIEMENT");
     console.log("=".repeat(40));
     console.log(`🏷️  Rent2Repay: ${rent2repayAddress}`);
@@ -125,8 +152,8 @@ async function main() {
     console.log(`⚙️  Limites: 100 WXDAI/semaine + 50 USDC/semaine`);
 
     console.log("\n✅ PRÊT POUR L'INTERFACE WEB");
-    console.log("config.js a été automatiquement mis à jour !");
-    console.log("Vous pouvez maintenant ouvrir l'interface web");
+    console.log("config.js et contract-addresses.json mis à jour !");
+    console.log("Vous pouvez maintenant utiliser les scripts de vérification");
 
     return deployedAddresses;
 }
@@ -134,7 +161,7 @@ async function main() {
 main()
     .then((addresses) => {
         console.log("\n🎉 Déploiement complet terminé avec succès !");
-        console.log("L'interface web est prête à être utilisée");
+        console.log("L'interface web et les scripts sont prêts à être utilisés");
         process.exit(0);
     })
     .catch((error) => {

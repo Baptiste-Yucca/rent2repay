@@ -8,7 +8,25 @@ const path = require('path');
 
 // Charger la config
 function loadConfig() {
+    // Essayer d'abord contract-addresses.json (plus simple et fiable)
+    const jsonConfigPath = path.join(__dirname, 'contract-addresses.json');
+    if (fs.existsSync(jsonConfigPath)) {
+        const jsonContent = fs.readFileSync(jsonConfigPath, 'utf8');
+        const config = JSON.parse(jsonContent);
+        console.log('📋 Configuration chargée depuis contract-addresses.json');
+        return config;
+    }
+
+    // Fallback: parser config.js (méthode ancienne)
+    console.log('⚠️  contract-addresses.json introuvable, tentative avec config.js...');
     const configPath = path.join(__dirname, 'config.js');
+
+    if (!fs.existsSync(configPath)) {
+        console.log('❌ Aucun fichier de configuration trouvé');
+        console.log('💡 Lancez d\'abord: node deploy-complete-auto.js');
+        process.exit(1);
+    }
+
     const configContent = fs.readFileSync(configPath, 'utf8');
 
     // Extraire les adresses des contrats
@@ -93,18 +111,26 @@ async function main() {
                 } else {
                     // Token ERC20
                     address = config[token.configKey];
-                    if (address) {
+
+                    if (address && address !== 'undefined' && address !== '') {
                         const tokenContract = new ethers.Contract(address, TOKEN_ABI, provider);
 
-                        // Balance
-                        const bal = await tokenContract.balanceOf(walletAddress);
-                        balance = formatAmount(bal);
+                        // Test de connexion au contrat
+                        try {
+                            // Balance
+                            const bal = await tokenContract.balanceOf(walletAddress);
+                            balance = formatAmount(bal);
 
-                        // Approbation pour Rent2Repay
-                        if (config.RENT2REPAY) {
-                            const allowance = await tokenContract.allowance(walletAddress, config.RENT2REPAY);
-                            approval = formatAmount(allowance);
+                            // Approbation pour Rent2Repay
+                            if (config.RENT2REPAY && config.RENT2REPAY !== 'undefined') {
+                                const allowance = await tokenContract.allowance(walletAddress, config.RENT2REPAY);
+                                approval = formatAmount(allowance);
+                            }
+                        } catch (contractError) {
+                            throw contractError;
                         }
+                    } else {
+                        throw new Error("Adresse manquante");
                     }
                 }
 

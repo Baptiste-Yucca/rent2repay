@@ -354,7 +354,7 @@ contract Rent2Repay is AccessControl, Pausable {
 
         // Transfer and approve tokens for RMM
         IERC20(token).transferFrom(user, address(this), amount);
-        IERC20(token).approve(address(rmm), amount);
+        //IERC20(token).approve(address(rmm), amount);
 
         // Call RMM repay function
         uint256 actualAmountRepaid = rmm.repay(
