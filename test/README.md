@@ -29,7 +29,27 @@ Cette commande :
 
 ## 🛠️ 2. Déploiement de l'environnement de test
 
-### Option A : Déploiement automatique complet (Recommandé)
+### Option A : Déploiement ultra-rapide avec setup complet (⚡ Recommandé)
+
+Pour un déploiement complet en une seule commande :
+
+```bash
+# Dans un nouveau terminal, depuis le dossier test/front_local
+cd test/front_local
+chmod +x setup-full.sh
+./setup-full.sh
+```
+
+Ce script automatise TOUT le processus :
+- ✅ Vérifie que le nœud Hardhat fonctionne
+- 🚀 Déploie tous les contrats automatiquement
+- 🔧 Configure l'environnement de test
+- ✨ Exécute les vérifications de base
+- 📋 Affiche un résumé des commandes disponibles
+
+**C'est le moyen le plus rapide pour commencer !**
+
+### Option B : Déploiement automatique complet
 
 Le moyen le plus simple pour déployer tout l'environnement :
 
@@ -46,7 +66,7 @@ Ce script déploie automatiquement :
 - **Tokens de dette** : debtWXDAI et debtUSDC
 - **Configuration User1** : Un utilisateur pré-configuré pour les tests
 
-### Option B : Déploiement manuel étape par étape
+### Option C : Déploiement manuel étape par étape
 
 Si vous préférez contrôler chaque étape :
 
@@ -210,6 +230,7 @@ test/
 ├── Rent2Repay.test.js          # Tests principaux
 ├── token-management.test.js     # Tests de gestion des tokens
 └── front_local/                # Outils de test frontend
+    ├── setup-full.sh           # 🚀 Script de setup complet automatique
     ├── check                   # Script de vérification
     ├── check-script.js         # Logique de vérification
     ├── repay                   # Script de remboursement
@@ -225,11 +246,22 @@ test/
 
 ## 🎯 8. Workflow de développement recommandé
 
-1. **Démarrage** : Lancez le nœud Hardhat
-2. **Déploiement** : Utilisez `deploy-complete-auto.js`
-3. **Vérification** : Exécutez `./check` pour valider
-4. **Tests** : Utilisez les scripts ou l'interface web
-5. **Itération** : Modifiez le code et redéployez si nécessaire
+### Démarrage rapide (⚡ Nouveau)
+```bash
+# 1. Démarrer le nœud
+npx hardhat node
+
+# 2. Dans un autre terminal - Setup complet automatique
+cd test/front_local
+./setup-full.sh
+```
+
+### Workflow détaillé
+1. **Démarrage** : Lancez le nœud Hardhat (`npx hardhat node`)
+2. **Setup automatique** : Utilisez `./setup-full.sh` pour tout configurer
+3. **Vérification** : Le script exécute automatiquement les vérifications
+4. **Tests** : Utilisez les scripts (`./check`, `./token`, `./repay`) ou l'interface web
+5. **Itération** : Modifiez le code et relancez `./setup-full.sh` si nécessaire
 
 ## 📞 Support
 
