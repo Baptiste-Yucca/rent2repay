@@ -1,0 +1,4 @@
+#!/bin/bash
+# Script wrapper pour check-script.js
+cd "$(dirname "$0")"
+node check-script.js "$@" 

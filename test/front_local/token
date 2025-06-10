@@ -1,0 +1,4 @@
+#!/bin/bash
+# Script wrapper pour token-script.js
+cd "$(dirname "$0")"
+node token-script.js "$@" 
