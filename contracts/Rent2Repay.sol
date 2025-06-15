@@ -16,6 +16,8 @@ import "./interfaces/IRMM.sol";
  */
 contract Rent2Repay is AccessControl, Pausable {
     /// @notice Constant for one week in seconds
+    uint256 private constant _DAY_IN_SECONDS = 24 * 60 * 60;
+    /// @notice Constant for one week in seconds
     uint256 private constant _WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
 
     /// @notice Role definitions
@@ -30,11 +32,15 @@ contract Rent2Repay is AccessControl, Pausable {
     uint256 public constant DEFAULT_INTEREST_RATE_MODE = 2;
 
     /// @notice Maps user addresses to token addresses to their weekly maximum amount
-    mapping(address => mapping(address => uint256)) public weeklyMaxAmounts;
+    mapping(address => mapping(address => uint256)) public allowedMaxAmounts;
     
     /// @notice Maps user addresses to their last repayment timestamp (shared across all tokens)
     mapping(address => uint256) public lastRepayTimestamps;
     
+
+    /// @notice Maps user addresses to token addresses to their periodicity
+    mapping(address => uint256) public periodicity;
+
     /// @notice Maps user addresses to token addresses to their current week spent amount
     mapping(address => mapping(address => uint256)) public currentWeekSpent;
 
@@ -215,9 +221,10 @@ contract Rent2Repay is AccessControl, Pausable {
             if (!authorizedTokens[tokens[i]]) revert TokenNotAuthorized();
             if (amounts[i] == 0) revert AmountMustBeGreaterThanZero();
 
-            weeklyMaxAmounts[msg.sender][tokens[i]] = amounts[i];
+            allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
             currentWeekSpent[msg.sender][tokens[i]] = 0;
-            
+
+            // TODO to move at EOF ?
             emit Rent2RepayConfigured(msg.sender, tokens[i], amounts[i]);
         }
 
@@ -225,6 +232,10 @@ contract Rent2Repay is AccessControl, Pausable {
         if (lastRepayTimestamps[msg.sender] == 0) {
             lastRepayTimestamps[msg.sender] = block.timestamp;
         }
+
+        periodicity[msg.sender] = 0;
+
+
     }
 
     /**
@@ -236,7 +247,7 @@ contract Rent2Repay is AccessControl, Pausable {
         validTokenAddress(token)
         userIsAuthorizedForToken(msg.sender, token) 
     {
-        weeklyMaxAmounts[msg.sender][token] = 0;
+        allowedMaxAmounts[msg.sender][token] = 0;
         currentWeekSpent[msg.sender][token] = 0;
         
         emit Rent2RepayRevoked(msg.sender, token);
@@ -272,7 +283,7 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
-     * @notice Unpauses the contract - only emergency role can do this
+     * @notice Unpauses the contract - only ADMIN (DAO) role can do this
      */
     function unpause() external onlyRole(ADMIN_ROLE) {
         _unpause();
@@ -285,7 +296,7 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function isAuthorized(address user) public view returns (bool) {
         for (uint256 i = 0; i < tokenList.length; i++) {
-            if (weeklyMaxAmounts[user][tokenList[i]] > 0) {
+            if (allowedMaxAmounts[user][tokenList[i]] > 0) {
                 return true;
             }
         }
@@ -299,7 +310,7 @@ contract Rent2Repay is AccessControl, Pausable {
      * @return true if authorized for this token, false otherwise
      */
     function isAuthorizedForToken(address user, address token) public view returns (bool) {
-        return weeklyMaxAmounts[user][token] > 0;
+        return allowedMaxAmounts[user][token] > 0;
     }
 
     /**
@@ -310,7 +321,7 @@ contract Rent2Repay is AccessControl, Pausable {
      * @return Available amount for repayment this week for this token
      */
     function getAvailableAmountThisWeek(address user, address token) public view returns (uint256) {
-        uint256 maxAmount = weeklyMaxAmounts[user][token];
+        uint256 maxAmount = allowedMaxAmounts[user][token];
         
         if (maxAmount == 0) {
             return 0; // User not authorized for this token
@@ -347,7 +358,7 @@ contract Rent2Repay is AccessControl, Pausable {
 
         // Check if the amount is within the limit for this token
         uint256 newSpentAmount = currentWeekSpent[user][token] + amount;
-        if (newSpentAmount > weeklyMaxAmounts[user][token]) revert WeeklyLimitExceeded();
+        if (newSpentAmount > allowedMaxAmounts[user][token]) revert WeeklyLimitExceeded();
 
         // Additional security: prevent overflow attacks
         require(newSpentAmount >= currentWeekSpent[user][token], "Overflow protection");
@@ -373,7 +384,7 @@ contract Rent2Repay is AccessControl, Pausable {
             user, 
             token,
             actualAmountRepaid, 
-            weeklyMaxAmounts[user][token] - newSpentAmount,
+            allowedMaxAmounts[user][token] - newSpentAmount,
             msg.sender
         );
         
@@ -398,7 +409,7 @@ contract Rent2Repay is AccessControl, Pausable {
         ) 
     {
         return (
-            weeklyMaxAmounts[user][token], 
+            allowedMaxAmounts[user][token], 
             currentWeekSpent[user][token],
             lastRepayTimestamps[user]
         );
@@ -424,7 +435,7 @@ contract Rent2Repay is AccessControl, Pausable {
         
         // Count authorized tokens for this user
         for (uint256 i = 0; i < tokenList.length; i++) {
-            if (weeklyMaxAmounts[user][tokenList[i]] > 0) {
+            if (allowedMaxAmounts[user][tokenList[i]] > 0) {
                 authorizedCount++;
             }
         }
@@ -437,9 +448,9 @@ contract Rent2Repay is AccessControl, Pausable {
         // Fill arrays
         uint256 index = 0;
         for (uint256 i = 0; i < tokenList.length; i++) {
-            if (weeklyMaxAmounts[user][tokenList[i]] > 0) {
+            if (allowedMaxAmounts[user][tokenList[i]] > 0) {
                 tokens[index] = tokenList[i];
-                maxAmounts[index] = weeklyMaxAmounts[user][tokenList[i]];
+                maxAmounts[index] = allowedMaxAmounts[user][tokenList[i]];
                 spentAmounts[index] = currentWeekSpent[user][tokenList[i]];
                 index++;
             }
@@ -493,8 +504,8 @@ contract Rent2Repay is AccessControl, Pausable {
         // This would be very expensive with many users
         /*
         for (uint256 i = 0; i < allUsers.length; i++) {
-            if (weeklyMaxAmounts[allUsers[i]][token] > 0) {
-                weeklyMaxAmounts[allUsers[i]][token] = 0;
+            if (allowedMaxAmounts[allUsers[i]][token] > 0) {
+                allowedMaxAmounts[allUsers[i]][token] = 0;
                 currentWeekSpent[allUsers[i]][token] = 0;
                 emit Rent2RepayRevoked(allUsers[i], token);
             }
@@ -520,7 +531,7 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function _removeUserAllTokens(address user) internal {
         for (uint256 i = 0; i < tokenList.length; i++) {
-            weeklyMaxAmounts[user][tokenList[i]] = 0;
+            allowedMaxAmounts[user][tokenList[i]] = 0;
             currentWeekSpent[user][tokenList[i]] = 0;
         }
         lastRepayTimestamps[user] = 0;
@@ -583,8 +594,8 @@ contract Rent2Repay is AccessControl, Pausable {
         if (authorizedTokens[token]) revert TokenStillAuthorized();
 
         for (uint256 i = 0; i < users.length; i++) {
-            if (users[i] != address(0) && weeklyMaxAmounts[users[i]][token] > 0) {
-                weeklyMaxAmounts[users[i]][token] = 0;
+            if (users[i] != address(0) && allowedMaxAmounts[users[i]][token] > 0) {
+                allowedMaxAmounts[users[i]][token] = 0;
                 currentWeekSpent[users[i]][token] = 0;
                 emit Rent2RepayRevoked(users[i], token);
             }

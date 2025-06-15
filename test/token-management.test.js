@@ -151,7 +151,7 @@ describe("Token Management Behavior", function () {
             await rent2Repay.connect(admin).unauthorizeToken(await daiToken.getAddress());
 
             // getUserConfigs should still return DAI if user has it configured
-            // (because the function checks weeklyMaxAmounts, not authorizedTokens)
+            // (because the function checks allowedMaxAmounts, not authorizedTokens)
             userConfigs = await rent2Repay.getUserConfigs(user.address);
             expect(userConfigs[0].length).to.equal(2); // Still 2 tokens in user's config
         });
