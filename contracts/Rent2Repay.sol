@@ -274,7 +274,7 @@ contract Rent2Repay is AccessControl, Pausable {
     /**
      * @notice Unpauses the contract - only emergency role can do this
      */
-    function unpause() external onlyRole(EMERGENCY_ROLE) {
+    function unpause() external onlyRole(ADMIN_ROLE) {
         _unpause();
     }
 
