@@ -54,10 +54,12 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @param user The user address that configured the system
     /// @param token The token address configured
     /// @param weeklyMaxAmount The weekly maximum amount set by the user for this token
+    /// @param periodicity todo
     event Rent2RepayConfigured(
         address indexed user, 
-        address indexed token, 
-        uint256 weeklyMaxAmount
+        address[] indexed token, 
+        uint256[] weeklyMaxAmount,
+        uint256 periodicity
     );
 
     /// @notice Emitted when a user revokes their Rent2Repay authorization for a specific token
@@ -223,9 +225,6 @@ contract Rent2Repay is AccessControl, Pausable {
 
             allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
             currentWeekSpent[msg.sender][tokens[i]] = 0;
-
-            // TODO to move at EOF ?
-            emit Rent2RepayConfigured(msg.sender, tokens[i], amounts[i]);
         }
 
         // Initialize lastRepayTimestamp if it's the first configuration
@@ -235,6 +234,7 @@ contract Rent2Repay is AccessControl, Pausable {
 
         periodicity[msg.sender] = 0;
 
+        emit Rent2RepayConfigured(msg.sender, tokens, amounts, periodicity);
 
     }
 
