@@ -218,14 +218,14 @@ contract Rent2Repay is AccessControl, Pausable {
         require(tokens.length == amounts.length, "Arrays length mismatch");
         require(tokens.length > 0, "Empty arrays");
 
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokens[i] == address(0)) revert InvalidTokenAddress();
-            if (!authorizedTokens[tokens[i]]) revert TokenNotAuthorized();
-            if (amounts[i] == 0) revert AmountMustBeGreaterThanZero();
+            for (uint256 i = 0; i < tokens.length; i++) {
+                if (tokens[i] == address(0)) revert InvalidTokenAddress();
+                if (!authorizedTokens[tokens[i]]) revert TokenNotAuthorized();
+                if (amounts[i] == 0) revert AmountMustBeGreaterThanZero();
 
-            allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
-            currentWeekSpent[msg.sender][tokens[i]] = 0;
-        }
+                allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
+                currentWeekSpent[msg.sender][tokens[i]] = 0;
+            }
 
         // Initialize lastRepayTimestamp if it's the first configuration
         if (lastRepayTimestamps[msg.sender] == 0) {
@@ -351,7 +351,16 @@ contract Rent2Repay is AccessControl, Pausable {
         userIsAuthorizedForToken(user, token) 
         returns (bool) 
     {
+        // security
+        if (allowedMaxAmounts[user][token] == 0) revert("User not configured for token");
+        if (periodicity[user] == 0) revert("Periodicity not set");
+        if (amount == 0) revert("Amount must be greater than zero");
+
+
+        // TODO check balance abet token 
+
         // Reset weekly counter if a new week has started
+        // TODO move to period
         if (_isNewWeek(lastRepayTimestamps[user])) {
             _resetWeeklyCounters(user);
         }
@@ -530,11 +539,13 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param user The user to remove
      */
     function _removeUserAllTokens(address user) internal {
+        // NOTE Solidity: key removing is impossible
         for (uint256 i = 0; i < tokenList.length; i++) {
             allowedMaxAmounts[user][tokenList[i]] = 0;
             currentWeekSpent[user][tokenList[i]] = 0;
         }
         lastRepayTimestamps[user] = 0;
+        periodicity[user] = 0;
     }
 
     /**
