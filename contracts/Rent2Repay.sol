@@ -25,6 +25,12 @@ contract Rent2Repay is AccessControl, Pausable {
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
+    /// @notice Structure to represent a token pair (token + debt token)
+    struct TokenPair {
+        address token;
+        address debtToken;
+    }
+
     /// @notice RMM contract interface
     IRMM public immutable rmm;
     
@@ -41,14 +47,17 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @notice Maps user addresses to token addresses to their periodicity
     mapping(address => uint256) public periodicity;
 
-    /// @notice Maps user addresses to token addresses to their current week spent amount
-    mapping(address => mapping(address => uint256)) public currentWeekSpent;
-
     /// @notice Maps token addresses to their authorization status
     mapping(address => bool) public authorizedTokens;
     
-    /// @notice Array of all authorized token addresses
-    address[] public tokenList;
+    /// @notice Array of all authorized token pairs (token + debt token)
+    TokenPair[] public tokenList;
+
+    /// @notice Maps token addresses to their debt token addresses for quick lookup
+    mapping(address => address) public tokenToDebtToken;
+
+    /// @notice Maps debt token addresses to their token addresses for quick lookup
+    mapping(address => address) public debtTokenToToken;
 
     /// @notice Emitted when a user configures the Rent2Repay mechanism for a specific token
     /// @param user The user address that configured the system
@@ -98,6 +107,11 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @param token The token address that was unauthorized
     event TokenUnauthorized(address indexed token);
 
+    /// @notice Emitted when a token pair is authorized
+    /// @param token The token address that was authorized
+    /// @param debtToken The debt token address associated with the token
+    event TokenPairAuthorized(address indexed token, address indexed debtToken);
+
     /// @notice Custom errors for better gas efficiency
     error AmountMustBeGreaterThanZero();
     error UserNotAuthorized();
@@ -112,6 +126,7 @@ contract Rent2Repay is AccessControl, Pausable {
     error TokenAlreadyAuthorized();
     error TokenNotFound();
     error TokenStillAuthorized();
+    error NoDebtTokenAssociated();
 
     /**
      * @notice Constructor that sets up roles, RMM integration and initial authorized tokens
@@ -120,7 +135,9 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param operator Address that will have operator privileges
      * @param _rmm Address of the RMM contract
      * @param wxdaiToken Address of the WXDAI token
+     * @param wxdaiDebtToken Address of the WXDAI debt token
      * @param usdcToken Address of the USDC token
+     * @param usdcDebtToken Address of the USDC debt token
      */
     constructor(
         address admin, 
@@ -128,7 +145,9 @@ contract Rent2Repay is AccessControl, Pausable {
         address operator,
         address _rmm,
         address wxdaiToken,
-        address usdcToken
+        address wxdaiDebtToken,
+        address usdcToken,
+        address usdcDebtToken
     ) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
@@ -137,9 +156,9 @@ contract Rent2Repay is AccessControl, Pausable {
         
         rmm = IRMM(_rmm);
         
-        // Initialize with WXDAI and USDC as authorized tokens
-        _authorizeToken(wxdaiToken);
-        _authorizeToken(usdcToken);
+        // Initialize with WXDAI and USDC as authorized token pairs
+        _authorizeTokenPair(wxdaiToken, wxdaiDebtToken);
+        _authorizeTokenPair(usdcToken, usdcDebtToken);
     }
 
     /**
@@ -224,7 +243,6 @@ contract Rent2Repay is AccessControl, Pausable {
                 if (amounts[i] == 0) revert AmountMustBeGreaterThanZero();
 
                 allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
-                currentWeekSpent[msg.sender][tokens[i]] = 0;
             }
 
         // Initialize lastRepayTimestamp if it's the first configuration
@@ -232,9 +250,9 @@ contract Rent2Repay is AccessControl, Pausable {
             lastRepayTimestamps[msg.sender] = block.timestamp;
         }
 
-        periodicity[msg.sender] = 0;
+        periodicity[msg.sender] = _WEEK_IN_SECONDS;
 
-        emit Rent2RepayConfigured(msg.sender, tokens, amounts, periodicity);
+        emit Rent2RepayConfigured(msg.sender, tokens, amounts, periodicity[msg.sender]);
 
     }
 
@@ -248,7 +266,6 @@ contract Rent2Repay is AccessControl, Pausable {
         userIsAuthorizedForToken(msg.sender, token) 
     {
         allowedMaxAmounts[msg.sender][token] = 0;
-        currentWeekSpent[msg.sender][token] = 0;
         
         emit Rent2RepayRevoked(msg.sender, token);
     }
@@ -296,7 +313,7 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function isAuthorized(address user) public view returns (bool) {
         for (uint256 i = 0; i < tokenList.length; i++) {
-            if (allowedMaxAmounts[user][tokenList[i]] > 0) {
+            if (allowedMaxAmounts[user][tokenList[i].token] > 0) {
                 return true;
             }
         }
@@ -313,24 +330,6 @@ contract Rent2Repay is AccessControl, Pausable {
         return allowedMaxAmounts[user][token] > 0;
     }
 
-    /**
-     * @notice Calculates the available amount for repayment this week for a specific token
-     * @dev If more than a week has passed since last repayment, resets the weekly counter
-     * @param user Address of the user
-     * @param token Address of the token
-     * @return Available amount for repayment this week for this token
-     */
-    function getAvailableAmountThisWeek(address user, address token) public view returns (uint256) {
-        uint256 maxAmount = allowedMaxAmounts[user][token];
-        
-        if (maxAmount == 0) {
-            return 0; // User not authorized for this token
-        }
-
-        return _isNewWeek(lastRepayTimestamps[user]) 
-            ? maxAmount 
-            : maxAmount - currentWeekSpent[user][token];
-    }
 
     /**
      * @notice Executes automatic repayment for a user with a specific token
@@ -347,7 +346,6 @@ contract Rent2Repay is AccessControl, Pausable {
         validTokenAddress(token)
         onlyAuthorizedToken(token)
         notSelf(user)
-        validAmount(amount) 
         userIsAuthorizedForToken(user, token) 
         returns (bool) 
     {
@@ -356,21 +354,19 @@ contract Rent2Repay is AccessControl, Pausable {
         if (periodicity[user] == 0) revert("Periodicity not set");
         if (amount == 0) revert("Amount must be greater than zero");
 
+        // Get the debt token for this token
+        address debtToken = tokenToDebtToken[token];
+        if (debtToken == address(0)) revert NoDebtTokenAssociated();
 
         // TODO check balance abet token 
+        uint256 remainingDebt = IERC20(debtToken).balanceOf(user);
+        if (remainingDebt == 0) revert("No Debt");
 
         // Reset weekly counter if a new week has started
-        // TODO move to period
-        if (_isNewWeek(lastRepayTimestamps[user])) {
-            _resetWeeklyCounters(user);
-        }
+        // TODO Check to period
+        
 
-        // Check if the amount is within the limit for this token
-        uint256 newSpentAmount = currentWeekSpent[user][token] + amount;
-        if (newSpentAmount > allowedMaxAmounts[user][token]) revert WeeklyLimitExceeded();
-
-        // Additional security: prevent overflow attacks
-        require(newSpentAmount >= currentWeekSpent[user][token], "Overflow protection");
+        // TODO check if remaining debt < allowed amount 
 
         // Transfer and approve tokens for RMM
         IERC20(token).transferFrom(user, address(this), amount);
@@ -385,7 +381,6 @@ contract Rent2Repay is AccessControl, Pausable {
         );
 
         // Update the values only after successful repayment
-        currentWeekSpent[user][token] = newSpentAmount;
         lastRepayTimestamps[user] = block.timestamp;
 
         // Emit event with remaining amount
@@ -393,7 +388,7 @@ contract Rent2Repay is AccessControl, Pausable {
             user, 
             token,
             actualAmountRepaid, 
-            allowedMaxAmounts[user][token] - newSpentAmount,
+            allowedMaxAmounts[user][token],
             msg.sender
         );
         
@@ -405,21 +400,18 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param user Address of the user
      * @param token Address of the token
      * @return weeklyMaxAmount The maximum amount per week for this token
-     * @return currentSpent Amount spent in the current week for this token
      * @return lastRepayTimestamp Timestamp of the last repayment (shared across tokens)
      */
     function getUserConfigForToken(address user, address token) 
         external 
         view 
         returns (
-            uint256 weeklyMaxAmount, 
-            uint256 currentSpent, 
+            uint256 weeklyMaxAmount,
             uint256 lastRepayTimestamp
         ) 
     {
         return (
-            allowedMaxAmounts[user][token], 
-            currentWeekSpent[user][token],
+            allowedMaxAmounts[user][token],
             lastRepayTimestamps[user]
         );
     }
@@ -444,7 +436,7 @@ contract Rent2Repay is AccessControl, Pausable {
         
         // Count authorized tokens for this user
         for (uint256 i = 0; i < tokenList.length; i++) {
-            if (allowedMaxAmounts[user][tokenList[i]] > 0) {
+            if (allowedMaxAmounts[user][tokenList[i].token] > 0) {
                 authorizedCount++;
             }
         }
@@ -457,10 +449,9 @@ contract Rent2Repay is AccessControl, Pausable {
         // Fill arrays
         uint256 index = 0;
         for (uint256 i = 0; i < tokenList.length; i++) {
-            if (allowedMaxAmounts[user][tokenList[i]] > 0) {
-                tokens[index] = tokenList[i];
-                maxAmounts[index] = allowedMaxAmounts[user][tokenList[i]];
-                spentAmounts[index] = currentWeekSpent[user][tokenList[i]];
+            if (allowedMaxAmounts[user][tokenList[i].token] > 0) {
+                tokens[index] = tokenList[i].token;
+                maxAmounts[index] = allowedMaxAmounts[user][tokenList[i].token];
                 index++;
             }
         }
@@ -471,11 +462,59 @@ contract Rent2Repay is AccessControl, Pausable {
      * @return Array of authorized token addresses
      */
     function getAuthorizedTokens() external view returns (address[] memory) {
+        address[] memory tokenAddresses = new address[](tokenList.length);
+        for (uint256 i = 0; i < tokenList.length; i++) {
+            tokenAddresses[i] = tokenList[i].token;
+        }
+        return tokenAddresses;
+    }
+
+    /**
+     * @notice Gets the list of all authorized token pairs
+     * @return Array of TokenPair structures containing token and debt token addresses
+     */
+    function getAuthorizedTokenPairs() external view returns (TokenPair[] memory) {
         return tokenList;
     }
 
     /**
-     * @notice Allows admins to authorize a new token
+     * @notice Gets the debt token address for a given token
+     * @param token The token address
+     * @return The debt token address associated with the token
+     */
+    function getDebtToken(address token) external view returns (address) {
+        return tokenToDebtToken[token];
+    }
+
+    /**
+     * @notice Gets the token address for a given debt token
+     * @param debtToken The debt token address
+     * @return The token address associated with the debt token
+     */
+    function getTokenFromDebtToken(address debtToken) external view returns (address) {
+        return debtTokenToToken[debtToken];
+    }
+
+    /**
+     * @notice Allows admins to authorize a new token pair
+     * @param token The token address to authorize
+     * @param debtToken The debt token address associated with the token
+     */
+    function authorizeTokenPair(address token, address debtToken) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+        validTokenAddress(token)
+        validTokenAddress(debtToken)
+    {
+        if (authorizedTokens[token]) revert TokenAlreadyAuthorized();
+        if (tokenToDebtToken[token] != address(0)) revert TokenAlreadyAuthorized();
+        if (debtTokenToToken[debtToken] != address(0)) revert TokenAlreadyAuthorized();
+        
+        _authorizeTokenPair(token, debtToken);
+    }
+
+    /**
+     * @notice Allows admins to authorize a new token (legacy function for backward compatibility)
      * @param token The token address to authorize
      */
     function authorizeToken(address token) 
@@ -502,35 +541,42 @@ contract Rent2Repay is AccessControl, Pausable {
         
         // Remove from tokenList
         for (uint256 i = 0; i < tokenList.length; i++) {
-            if (tokenList[i] == token) {
+            if (tokenList[i].token == token) {
+                // Clean up mappings
+                address debtToken = tokenToDebtToken[token];
+                if (debtToken != address(0)) {
+                    delete debtTokenToToken[debtToken];
+                    delete tokenToDebtToken[token];
+                }
+                
                 tokenList[i] = tokenList[tokenList.length - 1];
                 tokenList.pop();
                 break;
             }
         }
-        
-        // Option: Automatic cleanup (commented out for gas reasons)
-        // This would be very expensive with many users
-        /*
-        for (uint256 i = 0; i < allUsers.length; i++) {
-            if (allowedMaxAmounts[allUsers[i]][token] > 0) {
-                allowedMaxAmounts[allUsers[i]][token] = 0;
-                currentWeekSpent[allUsers[i]][token] = 0;
-                emit Rent2RepayRevoked(allUsers[i], token);
-            }
-        }
-        */
-        
         emit TokenUnauthorized(token);
     }
 
     /**
-     * @notice Internal function to authorize a token
+     * @notice Internal function to authorize a token pair
+     * @param token The token address to authorize
+     * @param debtToken The debt token address associated with the token
+     */
+    function _authorizeTokenPair(address token, address debtToken) internal {
+        authorizedTokens[token] = true;
+        tokenList.push(TokenPair({token: token, debtToken: debtToken}));
+        tokenToDebtToken[token] = debtToken;
+        debtTokenToToken[debtToken] = token;
+        emit TokenPairAuthorized(token, debtToken);
+    }
+
+    /**
+     * @notice Internal function to authorize a token (legacy function for backward compatibility)
      * @param token The token address to authorize
      */
     function _authorizeToken(address token) internal {
         authorizedTokens[token] = true;
-        tokenList.push(token);
+        tokenList.push(TokenPair({token: token, debtToken: address(0)}));
         emit TokenAuthorized(token);
     }
 
@@ -541,22 +587,12 @@ contract Rent2Repay is AccessControl, Pausable {
     function _removeUserAllTokens(address user) internal {
         // NOTE Solidity: key removing is impossible
         for (uint256 i = 0; i < tokenList.length; i++) {
-            allowedMaxAmounts[user][tokenList[i]] = 0;
-            currentWeekSpent[user][tokenList[i]] = 0;
+            allowedMaxAmounts[user][tokenList[i].token] = 0;
         }
         lastRepayTimestamps[user] = 0;
         periodicity[user] = 0;
     }
 
-    /**
-     * @notice Internal function to reset weekly counters for all tokens
-     * @param user The user to reset counters for
-     */
-    function _resetWeeklyCounters(address user) internal {
-        for (uint256 i = 0; i < tokenList.length; i++) {
-            currentWeekSpent[user][tokenList[i]] = 0;
-        }
-    }
 
     /**
      * @notice Internal function to check if a new week has started
@@ -607,36 +643,9 @@ contract Rent2Repay is AccessControl, Pausable {
         for (uint256 i = 0; i < users.length; i++) {
             if (users[i] != address(0) && allowedMaxAmounts[users[i]][token] > 0) {
                 allowedMaxAmounts[users[i]][token] = 0;
-                currentWeekSpent[users[i]][token] = 0;
                 emit Rent2RepayRevoked(users[i], token);
             }
         }
     }
 
-    /**
-     * @notice Returns all users who have configured a specific token (for cleanup purposes)
-     * @dev This function is expensive and should only be used off-chain or by admins
-     * @param token The token address to check
-     * @param startIndex Starting index for pagination
-     * @param maxResults Maximum number of results to return
-     * @return users Array of user addresses who have this token configured
-     * @return hasMore Whether there are more results available
-     */
-    function getUsersWithTokenConfig(
-        address token,
-        uint256 startIndex,
-        uint256 maxResults
-    ) 
-        external 
-        view 
-        returns (address[] memory users, bool hasMore) 
-    {
-        // This is a simplified version - in practice you'd need to track user addresses
-        // or use events to build this list off-chain
-        users = new address[](0);
-        hasMore = false;
-        
-        // Note: This function would be very expensive on-chain with many users
-        // In practice, you'd track user registrations or use events to build lists off-chain
-    }
 } 
