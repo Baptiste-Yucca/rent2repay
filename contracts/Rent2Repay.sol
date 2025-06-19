@@ -513,49 +513,6 @@ contract Rent2Repay is AccessControl, Pausable {
         _authorizeTokenPair(token, debtToken);
     }
 
-    /**
-     * @notice Allows admins to authorize a new token (legacy function for backward compatibility)
-     * @param token The token address to authorize
-     */
-    function authorizeToken(address token) 
-        external 
-        onlyRole(ADMIN_ROLE) 
-        validTokenAddress(token)
-    {
-        if (authorizedTokens[token]) revert TokenAlreadyAuthorized();
-        _authorizeToken(token);
-    }
-
-    /**
-     * @notice Allows admins to unauthorize a token
-     * @param token The token address to unauthorize
-     */
-    function unauthorizeToken(address token) 
-        external 
-        onlyRole(ADMIN_ROLE) 
-        validTokenAddress(token)
-    {
-        if (!authorizedTokens[token]) revert TokenNotAuthorized();
-        
-        authorizedTokens[token] = false;
-        
-        // Remove from tokenList
-        for (uint256 i = 0; i < tokenList.length; i++) {
-            if (tokenList[i].token == token) {
-                // Clean up mappings
-                address debtToken = tokenToDebtToken[token];
-                if (debtToken != address(0)) {
-                    delete debtTokenToToken[debtToken];
-                    delete tokenToDebtToken[token];
-                }
-                
-                tokenList[i] = tokenList[tokenList.length - 1];
-                tokenList.pop();
-                break;
-            }
-        }
-        emit TokenUnauthorized(token);
-    }
 
     /**
      * @notice Internal function to authorize a token pair
@@ -647,5 +604,4 @@ contract Rent2Repay is AccessControl, Pausable {
             }
         }
     }
-
 } 
