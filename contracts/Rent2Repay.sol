@@ -59,6 +59,12 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @notice Maps debt token addresses to their token addresses for quick lookup
     mapping(address => address) public debtTokenToToken;
 
+    /// @notice DAO fees in basis points (BPS) - 10000 = 100%
+    uint256 public daoFeesBPS = 50; // 0.5% default
+    
+    /// @notice Sender tips in basis points (BPS) - 10000 = 100%
+    uint256 public senderTipsBPS = 25; // 0.25% default
+
     /// @notice Emitted when a user configures the Rent2Repay mechanism for a specific token
     /// @param user The user address that configured the system
     /// @param token The token address configured
@@ -112,6 +118,32 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @param debtToken The debt token address associated with the token
     event TokenPairAuthorized(address indexed token, address indexed debtToken);
 
+    /// @notice Emitted when DAO fees are updated
+    /// @param oldFees The previous DAO fees in BPS
+    /// @param newFees The new DAO fees in BPS
+    /// @param admin The admin who updated the fees
+    event DaoFeesUpdated(uint256 oldFees, uint256 newFees, address indexed admin);
+
+    /// @notice Emitted when sender tips are updated
+    /// @param oldTips The previous sender tips in BPS
+    /// @param newTips The new sender tips in BPS
+    /// @param admin The admin who updated the tips
+    event SenderTipsUpdated(uint256 oldTips, uint256 newTips, address indexed admin);
+
+    /// @notice Emitted when fees are collected during repayment
+    /// @param user The user for whom the repayment was executed
+    /// @param token The token used for repayment
+    /// @param daoFees The DAO fees collected
+    /// @param senderTips The sender tips collected
+    /// @param executor The address that executed the repayment
+    event FeesCollected(
+        address indexed user,
+        address indexed token,
+        uint256 daoFees,
+        uint256 senderTips,
+        address indexed executor
+    );
+
     /// @notice Custom errors for better gas efficiency
     error AmountMustBeGreaterThanZero();
     error UserNotAuthorized();
@@ -127,6 +159,8 @@ contract Rent2Repay is AccessControl, Pausable {
     error TokenNotFound();
     error TokenStillAuthorized();
     error NoDebtTokenAssociated();
+    error InvalidFeesBPS();
+    error InvalidTipsBPS();
 
     /**
      * @notice Constructor that sets up roles, RMM integration and initial authorized tokens
@@ -232,7 +266,8 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function configureRent2Repay(
         address[] calldata tokens,
-        uint256[] calldata amounts
+        uint256[] calldata amounts,
+        uint256  period
     ) external whenNotPaused {
         require(tokens.length == amounts.length, "Arrays length mismatch");
         require(tokens.length > 0, "Empty arrays");
@@ -250,7 +285,7 @@ contract Rent2Repay is AccessControl, Pausable {
             lastRepayTimestamps[msg.sender] = block.timestamp;
         }
 
-        periodicity[msg.sender] = _WEEK_IN_SECONDS;
+        periodicity[msg.sender] = period == 0 ? _WEEK_IN_SECONDS : period;
 
         emit Rent2RepayConfigured(msg.sender, tokens, amounts, periodicity[msg.sender]);
 
@@ -369,12 +404,17 @@ contract Rent2Repay is AccessControl, Pausable {
 
         // Transfer and approve tokens for RMM
         IERC20(token).transferFrom(user, address(this), toRepay);
-        //IERC20(token).approve(address(rmm), amount);
 
-        // Call RMM repay function
+        // Calculate fees
+        uint256 daoFees;
+        uint256 senderTips;
+        uint256 amountForRepayment;
+        (daoFees, senderTips, amountForRepayment) = _calculateFees(toRepay);
+        
+        // Call RMM repay function with the amount minus fees
         uint256 actualAmountRepaid = rmm.repay(
             token,
-            toRepay,
+            amountForRepayment,
             DEFAULT_INTEREST_RATE_MODE,
             user
         );
@@ -388,6 +428,15 @@ contract Rent2Repay is AccessControl, Pausable {
             token,
             actualAmountRepaid, 
             allowedMaxAmounts[user][token],
+            msg.sender
+        );
+        
+        // Emit fees collected event
+        emit FeesCollected(
+            user,
+            token,
+            daoFees,
+            senderTips,
             msg.sender
         );
         
@@ -547,6 +596,32 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
+     * @notice Internal function to calculate fees for a given amount
+     * @param amount The amount to calculate fees for
+     * @return daoFees The DAO fees amount
+     * @return senderTips The sender tips amount
+     * @return amountForRepayment The amount remaining for repayment
+     */
+    function _calculateFees(uint256 amount) internal view returns (
+        uint256 daoFees,
+        uint256 senderTips,
+        uint256 amountForRepayment
+    ) {
+        daoFees = (amount * daoFeesBPS) / 10000;
+        senderTips = (amount * senderTipsBPS) / 10000;
+        uint256 totalFees = daoFees + senderTips;
+        
+        // Cap total fees to 95% of amount to ensure some amount goes to repayment
+        if (totalFees > (amount * 95) / 100) {
+            totalFees = (amount * 95) / 100;
+            daoFees = (totalFees * daoFeesBPS) / (daoFeesBPS + senderTipsBPS);
+            senderTips = totalFees - daoFees;
+        }
+        
+        amountForRepayment = amount - totalFees;
+    }
+
+    /**
      * @notice Emergency function to recover tokens sent to this contract
      * @param token The token to recover
      * @param amount The amount to recover
@@ -589,5 +664,85 @@ contract Rent2Repay is AccessControl, Pausable {
                 emit Rent2RepayRevoked(users[i], token);
             }
         }
+    }
+
+    /**
+     * @notice Allows admin to update DAO fees
+     * @param newFeesBPS New DAO fees in basis points (BPS) - 10000 = 100%
+     */
+    function updateDaoFees(uint256 newFeesBPS) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+    {
+        if (newFeesBPS > 1000) revert InvalidFeesBPS(); // Max 10%
+        
+        uint256 oldFees = daoFeesBPS;
+        daoFeesBPS = newFeesBPS;
+        
+        emit DaoFeesUpdated(oldFees, newFeesBPS, msg.sender);
+    }
+
+    /**
+     * @notice Allows admin to update sender tips
+     * @param newTipsBPS New sender tips in basis points (BPS) - 10000 = 100%
+     */
+    function updateSenderTips(uint256 newTipsBPS) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+    {
+        if (newTipsBPS > 1000) revert InvalidTipsBPS(); // Max 10%
+        
+        uint256 oldTips = senderTipsBPS;
+        senderTipsBPS = newTipsBPS;
+        
+        emit SenderTipsUpdated(oldTips, newTipsBPS, msg.sender);
+    }
+
+    /**
+     * @notice Allows admin to withdraw collected fees
+     * @param token The token to withdraw fees for
+     * @param daoRecipient The address to receive DAO fees
+     * @param senderTipsRecipient The address to receive sender tips
+     */
+    function withdrawFees(
+        address token,
+        address daoRecipient,
+        address senderTipsRecipient
+    ) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+        validTokenAddress(token)
+        validAddress(daoRecipient)
+        validAddress(senderTipsRecipient)
+    {
+        uint256 contractBalance = IERC20(token).balanceOf(address(this));
+        
+        if (contractBalance > 0) {
+            // Calculate how much to send to each recipient based on fee ratios
+            uint256 totalFeeRatio = daoFeesBPS + senderTipsBPS;
+            uint256 daoAmount = (contractBalance * daoFeesBPS) / totalFeeRatio;
+            uint256 senderTipsAmount = contractBalance - daoAmount;
+            
+            if (daoAmount > 0) {
+                IERC20(token).transfer(daoRecipient, daoAmount);
+            }
+            
+            if (senderTipsAmount > 0) {
+                IERC20(token).transfer(senderTipsRecipient, senderTipsAmount);
+            }
+        }
+    }
+
+    /**
+     * @notice Get current fee configuration
+     * @return daoFees Current DAO fees in BPS
+     * @return senderTips Current sender tips in BPS
+     */
+    function getFeeConfiguration() 
+        external 
+        view 
+        returns (uint256 daoFees, uint256 senderTips) 
+    {
+        return (daoFeesBPS, senderTipsBPS);
     }
 } 
