@@ -674,7 +674,8 @@ contract Rent2Repay is AccessControl, Pausable {
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        if (newFeesBPS > 1000) revert InvalidFeesBPS(); // Max 10%
+        // Secu Max 100%
+        if (newFeesBPS > 10000) revert InvalidFeesBPS();
         
         uint256 oldFees = daoFeesBPS;
         daoFeesBPS = newFeesBPS;
@@ -690,7 +691,8 @@ contract Rent2Repay is AccessControl, Pausable {
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        if (newTipsBPS > 1000) revert InvalidTipsBPS(); // Max 10%
+        // Secu Max 100%
+        if (newTipsBPS > 10000) revert InvalidTipsBPS();
         
         uint256 oldTips = senderTipsBPS;
         senderTipsBPS = newTipsBPS;
