@@ -66,7 +66,7 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @param periodicity todo
     event Rent2RepayConfigured(
         address indexed user, 
-        address[] indexed token, 
+        address[] token, 
         uint256[] weeklyMaxAmount,
         uint256 periodicity
     );
@@ -354,28 +354,27 @@ contract Rent2Repay is AccessControl, Pausable {
         if (periodicity[user] == 0) revert("Periodicity not set");
         if (amount == 0) revert("Amount must be greater than zero");
 
+        if(_isNewPeriod(user) == false) revert("wait next period");
+
         // Get the debt token for this token
         address debtToken = tokenToDebtToken[token];
         if (debtToken == address(0)) revert NoDebtTokenAssociated();
 
-        // TODO check balance abet token 
+        // Check 
         uint256 remainingDebt = IERC20(debtToken).balanceOf(user);
         if (remainingDebt == 0) revert("No Debt");
 
-        // Reset weekly counter if a new week has started
-        // TODO Check to period
-        
-
-        // TODO check if remaining debt < allowed amount 
+        uint256 toRepay = amount;
+        if(remainingDebt < amount) toRepay = remainingDebt;
 
         // Transfer and approve tokens for RMM
-        IERC20(token).transferFrom(user, address(this), amount);
+        IERC20(token).transferFrom(user, address(this), toRepay);
         //IERC20(token).approve(address(rmm), amount);
 
         // Call RMM repay function
         uint256 actualAmountRepaid = rmm.repay(
             token,
-            amount,
+            toRepay,
             DEFAULT_INTEREST_RATE_MODE,
             user
         );
@@ -421,15 +420,13 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param user Address of the user
      * @return tokens Array of authorized token addresses
      * @return maxAmounts Array of weekly max amounts for each token
-     * @return spentAmounts Array of current week spent amounts for each token
      */
     function getUserConfigs(address user) 
         external 
         view 
         returns (
             address[] memory tokens, 
-            uint256[] memory maxAmounts, 
-            uint256[] memory spentAmounts
+            uint256[] memory maxAmounts
         )
     {
         uint256 authorizedCount = 0;
@@ -444,7 +441,6 @@ contract Rent2Repay is AccessControl, Pausable {
         // Create arrays with the right size
         tokens = new address[](authorizedCount);
         maxAmounts = new uint256[](authorizedCount);
-        spentAmounts = new uint256[](authorizedCount);
         
         // Fill arrays
         uint256 index = 0;
@@ -528,16 +524,6 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
-     * @notice Internal function to authorize a token (legacy function for backward compatibility)
-     * @param token The token address to authorize
-     */
-    function _authorizeToken(address token) internal {
-        authorizedTokens[token] = true;
-        tokenList.push(TokenPair({token: token, debtToken: address(0)}));
-        emit TokenAuthorized(token);
-    }
-
-    /**
      * @notice Internal function to remove a user from the system for all tokens
      * @param user The user to remove
      */
@@ -556,8 +542,8 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param lastTimestamp The last recorded timestamp
      * @return true if more than a week has passed since lastTimestamp
      */
-    function _isNewWeek(uint256 lastTimestamp) internal view returns (bool) {
-        return block.timestamp >= lastTimestamp + _WEEK_IN_SECONDS;
+    function _isNewPeriod(address _user) internal view returns (bool) {
+        return block.timestamp >= lastRepayTimestamps[_user] + periodicity[_user];
     }
 
     /**
