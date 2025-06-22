@@ -65,6 +65,17 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @notice Sender tips in basis points (BPS) - 10000 = 100%
     uint256 public senderTipsBPS = 25; // 0.25% default
 
+    /// @notice Token address for DAO fee reduction - if user holds this token above minimum 
+    /// amount, DAO fees are reduced
+    address public daoFeeReductionToken;
+    
+    /// @notice Minimum amount of daoFeeReductionToken required to get DAO fee reduction
+    uint256 public daoFeeReductionMinimumAmount;
+
+    /// @notice DAO fee reduction percentage in basis points (BPS) - 10000 = 100% 
+    /// (exonération totale)
+    uint256 public daoFeeReductionBPS = 5000; // 50% default
+
     /// @notice Emitted when a user configures the Rent2Repay mechanism for a specific token
     /// @param user The user address that configured the system
     /// @param token The token address configured
@@ -130,6 +141,32 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @param admin The admin who updated the tips
     event SenderTipsUpdated(uint256 oldTips, uint256 newTips, address indexed admin);
 
+    /// @notice Emitted when DAO fee reduction token is updated
+    /// @param oldToken The previous DAO fee reduction token address
+    /// @param newToken The new DAO fee reduction token address
+    /// @param admin The admin who updated the token
+    event DaoFeeReductionTokenUpdated(address oldToken, address newToken, address indexed admin);
+
+    /// @notice Emitted when DAO fee reduction minimum amount is updated
+    /// @param oldAmount The previous minimum amount
+    /// @param newAmount The new minimum amount
+    /// @param admin The admin who updated the amount
+    event DaoFeeReductionMinimumAmountUpdated(
+        uint256 oldAmount, 
+        uint256 newAmount, 
+        address indexed admin
+    );
+
+    /// @notice Emitted when DAO fee reduction percentage is updated
+    /// @param oldPercentage The previous reduction percentage in BPS
+    /// @param newPercentage The new reduction percentage in BPS
+    /// @param admin The admin who updated the percentage
+    event DaoFeeReductionPercentageUpdated(
+        uint256 oldPercentage, 
+        uint256 newPercentage, 
+        address indexed admin
+    );
+
     /// @notice Emitted when fees are collected during repayment
     /// @param user The user for whom the repayment was executed
     /// @param token The token used for repayment
@@ -161,6 +198,8 @@ contract Rent2Repay is AccessControl, Pausable {
     error NoDebtTokenAssociated();
     error InvalidFeesBPS();
     error InvalidTipsBPS();
+    error InvalidDaoFeeReductionToken();
+    error InvalidDaoFeeReductionAmount();
 
     /**
      * @notice Constructor that sets up roles, RMM integration and initial authorized tokens
@@ -409,7 +448,7 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 daoFees;
         uint256 senderTips;
         uint256 amountForRepayment;
-        (daoFees, senderTips, amountForRepayment) = _calculateFees(toRepay);
+        (daoFees, senderTips, amountForRepayment) = _calculateFees(toRepay, user);
         
         // Call RMM repay function with the amount minus fees
         uint256 actualAmountRepaid = rmm.repay(
@@ -586,7 +625,7 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
 
-    /**
+    /*
      * @notice Internal function to check if a new week has started
      * @param lastTimestamp The last recorded timestamp
      * @return true if more than a week has passed since lastTimestamp
@@ -598,26 +637,35 @@ contract Rent2Repay is AccessControl, Pausable {
     /**
      * @notice Internal function to calculate fees for a given amount
      * @param amount The amount to calculate fees for
+     * @param user The user address to check for DAO fee reduction
      * @return daoFees The DAO fees amount
      * @return senderTips The sender tips amount
      * @return amountForRepayment The amount remaining for repayment
      */
-    function _calculateFees(uint256 amount) internal view returns (
+    function _calculateFees(uint256 amount, address user) internal view returns (
         uint256 daoFees,
         uint256 senderTips,
         uint256 amountForRepayment
     ) {
+        // Calculate base fees
         daoFees = (amount * daoFeesBPS) / 10000;
         senderTips = (amount * senderTipsBPS) / 10000;
-        uint256 totalFees = daoFees + senderTips;
         
-        // Cap total fees to 95% of amount to ensure some amount goes to repayment
-        if (totalFees > (amount * 95) / 100) {
-            totalFees = (amount * 95) / 100;
-            daoFees = (totalFees * daoFeesBPS) / (daoFeesBPS + senderTipsBPS);
-            senderTips = totalFees - daoFees;
+        // Check if user qualifies for DAO fee reduction
+        // cas si amount > totalfees divison euclidiennes??
+        //
+        if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
+            uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
+            if (userBalance >= daoFeeReductionMinimumAmount) {
+                // Reduce DAO fees by the configured percentage (BPS)
+                uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
+                daoFees = daoFees - reductionAmount;
+            }
         }
         
+        uint256 totalFees = daoFees + senderTips;   
+        // SECU to move on main fct ? if fees > 100 revert
+        if(totalFees > amount) revert("Exceed amount");
         amountForRepayment = amount - totalFees;
     }
 
@@ -701,41 +749,6 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
-     * @notice Allows admin to withdraw collected fees
-     * @param token The token to withdraw fees for
-     * @param daoRecipient The address to receive DAO fees
-     * @param senderTipsRecipient The address to receive sender tips
-     */
-    function withdrawFees(
-        address token,
-        address daoRecipient,
-        address senderTipsRecipient
-    ) 
-        external 
-        onlyRole(ADMIN_ROLE) 
-        validTokenAddress(token)
-        validAddress(daoRecipient)
-        validAddress(senderTipsRecipient)
-    {
-        uint256 contractBalance = IERC20(token).balanceOf(address(this));
-        
-        if (contractBalance > 0) {
-            // Calculate how much to send to each recipient based on fee ratios
-            uint256 totalFeeRatio = daoFeesBPS + senderTipsBPS;
-            uint256 daoAmount = (contractBalance * daoFeesBPS) / totalFeeRatio;
-            uint256 senderTipsAmount = contractBalance - daoAmount;
-            
-            if (daoAmount > 0) {
-                IERC20(token).transfer(daoRecipient, daoAmount);
-            }
-            
-            if (senderTipsAmount > 0) {
-                IERC20(token).transfer(senderTipsRecipient, senderTipsAmount);
-            }
-        }
-    }
-
-    /**
      * @notice Get current fee configuration
      * @return daoFees Current DAO fees in BPS
      * @return senderTips Current sender tips in BPS
@@ -746,5 +759,62 @@ contract Rent2Repay is AccessControl, Pausable {
         returns (uint256 daoFees, uint256 senderTips) 
     {
         return (daoFeesBPS, senderTipsBPS);
+    }
+
+    /**
+     * @notice Get DAO fee reduction configuration
+     * @return token The DAO fee reduction token address
+     * @return minimumAmount The minimum amount required for fee reduction
+     * @return reductionPercentage The reduction percentage in BPS
+     */
+    function getDaoFeeReductionConfiguration() 
+        external 
+        view 
+        returns (address token, uint256 minimumAmount, uint256 reductionPercentage) 
+    {
+        return (daoFeeReductionToken, daoFeeReductionMinimumAmount, daoFeeReductionBPS);
+    }
+
+    /**
+     * @notice Allows admin to update DAO fee reduction token
+     * @param newToken The new DAO fee reduction token address
+     */
+    function updateDaoFeeReductionToken(address newToken) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+        validTokenAddress(newToken)
+    {
+        address oldToken = daoFeeReductionToken;
+        daoFeeReductionToken = newToken;
+        emit DaoFeeReductionTokenUpdated(oldToken, newToken, msg.sender);
+    }
+
+    /**
+     * @notice Allows admin to update DAO fee reduction minimum amount
+     * @param newAmount The new minimum amount
+     */
+    function updateDaoFeeReductionMinimumAmount(uint256 newAmount) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+    {
+        uint256 oldAmount = daoFeeReductionMinimumAmount;
+        daoFeeReductionMinimumAmount = newAmount;
+        emit DaoFeeReductionMinimumAmountUpdated(oldAmount, newAmount, msg.sender);
+    }
+
+    /**
+     * @notice Allows admin to update DAO fee reduction percentage
+     * @param newPercentage The new reduction percentage in BPS
+     */
+    function updateDaoFeeReductionPercentage(uint256 newPercentage) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+    {
+        // Secu Max 100%
+        if (newPercentage > 10000) revert InvalidDaoFeeReductionAmount();
+        
+        uint256 oldPercentage = daoFeeReductionBPS;
+        daoFeeReductionBPS = newPercentage;
+        emit DaoFeeReductionPercentageUpdated(oldPercentage, newPercentage, msg.sender);
     }
 } 
