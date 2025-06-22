@@ -76,6 +76,9 @@ contract Rent2Repay is AccessControl, Pausable {
     /// (exonération totale)
     uint256 public daoFeeReductionBPS = 5000; // 50% default
 
+    /// @notice DAO treasury address that receives DAO fees
+    address public daoTreasuryAddress;
+
     /// @notice Emitted when a user configures the Rent2Repay mechanism for a specific token
     /// @param user The user address that configured the system
     /// @param token The token address configured
@@ -164,6 +167,16 @@ contract Rent2Repay is AccessControl, Pausable {
     event DaoFeeReductionPercentageUpdated(
         uint256 oldPercentage, 
         uint256 newPercentage, 
+        address indexed admin
+    );
+
+    /// @notice Emitted when DAO treasury address is updated
+    /// @param oldAddress The previous DAO treasury address
+    /// @param newAddress The new DAO treasury address
+    /// @param admin The admin who updated the address
+    event DaoTreasuryAddressUpdated(
+        address oldAddress, 
+        address newAddress, 
         address indexed admin
     );
 
@@ -441,7 +454,7 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 toRepay = amount;
         if(remainingDebt < amount) toRepay = remainingDebt;
 
-        // Transfer and approve tokens for RMM
+        // Transfer tokens from user to contract first
         IERC20(token).transferFrom(user, address(this), toRepay);
 
         // Calculate fees
@@ -449,6 +462,9 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 senderTips;
         uint256 amountForRepayment;
         (daoFees, senderTips, amountForRepayment) = _calculateFees(toRepay, user);
+        
+        // Transfer fees to respective addresses
+        _transferFees(token, daoFees, senderTips);
         
         // Call RMM repay function with the amount minus fees
         uint256 actualAmountRepaid = rmm.repay(
@@ -766,13 +782,24 @@ contract Rent2Repay is AccessControl, Pausable {
      * @return token The DAO fee reduction token address
      * @return minimumAmount The minimum amount required for fee reduction
      * @return reductionPercentage The reduction percentage in BPS
+     * @return treasuryAddress The DAO treasury address
      */
     function getDaoFeeReductionConfiguration() 
         external 
         view 
-        returns (address token, uint256 minimumAmount, uint256 reductionPercentage) 
+        returns (
+            address token, 
+            uint256 minimumAmount, 
+            uint256 reductionPercentage,
+            address treasuryAddress
+        ) 
     {
-        return (daoFeeReductionToken, daoFeeReductionMinimumAmount, daoFeeReductionBPS);
+        return (
+            daoFeeReductionToken, 
+            daoFeeReductionMinimumAmount, 
+            daoFeeReductionBPS, 
+            daoTreasuryAddress
+        );
     }
 
     /**
@@ -816,5 +843,35 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 oldPercentage = daoFeeReductionBPS;
         daoFeeReductionBPS = newPercentage;
         emit DaoFeeReductionPercentageUpdated(oldPercentage, newPercentage, msg.sender);
+    }
+
+    /**
+     * @notice Allows admin to update DAO treasury address
+     * @param newAddress The new DAO treasury address
+     */
+    function updateDaoTreasuryAddress(address newAddress) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+        validAddress(newAddress)
+    {
+        address oldAddress = daoTreasuryAddress;
+        daoTreasuryAddress = newAddress;
+        emit DaoTreasuryAddressUpdated(oldAddress, newAddress, msg.sender);
+    }
+
+    /**
+     * @notice Internal function to transfer fees to respective addresses
+     * @param token The token address
+     * @param daoFees The DAO fees amount
+     * @param senderTips The sender tips amount
+     */
+    function _transferFees(address token, uint256 daoFees, uint256 senderTips) internal {
+        if (daoFees > 0 && daoTreasuryAddress != address(0)) {
+            IERC20(token).transfer(daoTreasuryAddress, daoFees);
+        }
+        
+        if (senderTips > 0) {
+            IERC20(token).transfer(msg.sender, senderTips);
+        }
     }
 } 
