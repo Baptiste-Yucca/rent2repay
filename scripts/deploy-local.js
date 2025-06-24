@@ -74,8 +74,17 @@ async function main() {
         console.log("\n📝 === ÉTAPE 3: Déploiement du MockRMM ===");
 
         const MockRMMFactory = await ethers.getContractFactory("MockRMM");
-        console.log("🏗️ Déploiement de MockRMM...");
-        const mockRMM = await MockRMMFactory.deploy();
+        console.log("🏗️ Déploiement de MockRMM avec les paires token/debtToken...");
+
+        // Préparer les tableaux pour le constructeur
+        const tokens = [usdcAddress, wxdaiAddress];
+        const debtTokens = [debtUSDCAddress, debtWXDAIAddress];
+
+        console.log("📋 Configuration des paires:");
+        console.log("   - USDC:", usdcAddress, "-> DebtUSDC:", debtUSDCAddress);
+        console.log("   - WXDAI:", wxdaiAddress, "-> DebtWXDAI:", debtWXDAIAddress);
+
+        const mockRMM = await MockRMMFactory.deploy(tokens, debtTokens);
         await mockRMM.waitForDeployment();
         const rmmAddress = await mockRMM.getAddress();
         deployedAddresses.contracts.MockRMM = rmmAddress;

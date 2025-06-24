@@ -168,8 +168,8 @@ const testHelper = {
     },
 
     /**
-     * Exécute un remboursement pour un utilisateur
-     */
+ * Exécute un remboursement pour un utilisateur
+ */
     async executeRepayment(executorSigner, userAddress, tokenAddress, amount, contracts) {
         console.log(`\n💸 === Exécution d'un remboursement ===`);
         console.log("👤 Utilisateur:", userAddress);
@@ -180,11 +180,17 @@ const testHelper = {
         const rent2RepayAsExecutor = contracts.rent2Repay.connect(executorSigner);
 
         try {
+            // Vérifier le token de dette correspondant
+            const debtTokenAddress = await contracts.mockRMM.getDebtToken(tokenAddress);
+            console.log("🏦 Token de dette correspondant:", debtTokenAddress);
+            console.log("📊 Dette avant remboursement:", ethers.formatEther(await contracts.mockDebtUSDC.balanceOf(userAddress)));
+
             const tx = await rent2RepayAsExecutor.executeRepayment(userAddress, tokenAddress, amount);
             const receipt = await tx.wait();
 
             console.log("✅ Remboursement exécuté avec succès");
             console.log("🧾 Transaction hash:", receipt.hash);
+            console.log("📊 Dette après remboursement:", ethers.formatEther(await contracts.mockDebtUSDC.balanceOf(userAddress)));
 
             // Afficher les events
             receipt.logs.forEach(log => {
@@ -206,8 +212,8 @@ const testHelper = {
     },
 
     /**
-     * Affiche le statut Rent2Repay d'un utilisateur
-     */
+ * Affiche le statut Rent2Repay d'un utilisateur
+ */
     async showUserStatus(userAddress, contracts, addresses) {
         console.log(`\n📊 === Statut Rent2Repay pour ${userAddress} ===`);
 
@@ -222,6 +228,41 @@ const testHelper = {
         console.log("   - WXDAI:", ethers.formatEther(wxdaiAmount));
         console.log("⏰ Dernier remboursement:", new Date(Number(lastRepay) * 1000).toLocaleString());
         console.log("🔄 Périodicité:", Number(periodicity) / (24 * 60 * 60), "jours");
+    },
+
+    /**
+     * Prépare un scénario de test avec dettes
+     */
+    async setupDebtScenario(userAddress, contracts, amounts = {}) {
+        console.log(`\n🏦 === Préparation d'un scénario avec dettes pour ${userAddress} ===`);
+
+        const defaultAmounts = {
+            debtUSDC: "2000",
+            debtWXDAI: "1500"
+        };
+
+        const finalAmounts = { ...defaultAmounts, ...amounts };
+
+        // Mint des tokens de dette
+        if (finalAmounts.debtUSDC) {
+            await contracts.mockDebtUSDC.mint(userAddress, ethers.parseEther(finalAmounts.debtUSDC));
+            console.log("✅ Dette USDC créée:", finalAmounts.debtUSDC);
+        }
+
+        if (finalAmounts.debtWXDAI) {
+            await contracts.mockDebtWXDAI.mint(userAddress, ethers.parseEther(finalAmounts.debtWXDAI));
+            console.log("✅ Dette WXDAI créée:", finalAmounts.debtWXDAI);
+        }
+
+        // Approuver les tokens de dette pour le MockRMM (pour permettre le transfert vers address(0))
+        const debtUSDCAsUser = contracts.mockDebtUSDC.connect(await ethers.getSigner(userAddress));
+        const debtWXDAIAsUser = contracts.mockDebtWXDAI.connect(await ethers.getSigner(userAddress));
+
+        await debtUSDCAsUser.approve(contracts.mockRMM.getAddress(), ethers.MaxUint256);
+        await debtWXDAIAsUser.approve(contracts.mockRMM.getAddress(), ethers.MaxUint256);
+        console.log("✅ Approbations des tokens de dette effectuées");
+
+        console.log("📊 Dettes créées avec succès !");
     }
 };
 
