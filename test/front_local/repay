@@ -1,4 +1,0 @@
-#!/bin/bash
-# Script wrapper pour repay-script.js
-cd "$(dirname "$0")"
-node repay-script.js "$@" 
