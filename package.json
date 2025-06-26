@@ -10,7 +10,14 @@
     "format": "prettier --write 'contracts/**/*.sol'",
     "format:check": "prettier --check 'contracts/**/*.sol'",
     "lint": "solhint 'contracts/**/*.sol'",
-    "lint:fix": "solhint 'contracts/**/*.sol' --fix"
+    "lint:fix": "solhint 'contracts/**/*.sol' --fix",
+    "deploy:local": "node scripts/deploy-local.js",
+    "test:users": "node scripts/cli/show-users.js",
+    "test:config": "node scripts/cli/quick-config.js",
+    "test:repay": "node scripts/cli/quick-repayment.js",
+    "test:concurrency": "node scripts/cli/quick-concurrency.js",
+    "test:status": "node scripts/cli/show-status.js",
+    "demo": "node scripts/cli/demo-complete.js"
   },
   "keywords": [],
   "author": "",

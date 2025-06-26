@@ -168,7 +168,7 @@ const testHelper = {
     },
 
     /**
- * Exécute un remboursement pour un utilisateur
+ * Exécute un remboursement pour un utilisateur via rent2repay
  */
     async executeRepayment(executorSigner, userAddress, tokenAddress, amount, contracts) {
         console.log(`\n💸 === Exécution d'un remboursement ===`);
@@ -185,7 +185,7 @@ const testHelper = {
             console.log("🏦 Token de dette correspondant:", debtTokenAddress);
             console.log("📊 Dette avant remboursement:", ethers.formatEther(await contracts.mockDebtUSDC.balanceOf(userAddress)));
 
-            const tx = await rent2RepayAsExecutor.executeRepayment(userAddress, tokenAddress, amount);
+            const tx = await rent2RepayAsExecutor.rent2repay(userAddress, tokenAddress, amount);
             const receipt = await tx.wait();
 
             console.log("✅ Remboursement exécuté avec succès");
