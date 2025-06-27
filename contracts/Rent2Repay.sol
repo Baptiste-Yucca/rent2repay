@@ -42,7 +42,6 @@ contract Rent2Repay is AccessControl, Pausable {
     
     /// @notice Maps user addresses to their last repayment timestamp (shared across all tokens)
     mapping(address => uint256) public lastRepayTimestamps;
-    
 
     /// @notice Maps user addresses to token addresses to their periodicity
     mapping(address => uint256) public periodicity;
@@ -50,14 +49,11 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @notice Maps token addresses to their authorization status
     mapping(address => bool) public authorizedTokens;
     
-    /// @notice Array of all authorized token pairs (token + debt token)
-    TokenPair[] public tokenList;
-
-    /// @notice Maps token addresses to their debt token addresses for quick lookup
+    /// @notice Maps token addresses to their debt token addresses
     mapping(address => address) public tokenToDebtToken;
 
-    /// @notice Maps debt token addresses to their token addresses for quick lookup
-    mapping(address => address) public debtTokenToToken;
+    /// @notice Array to keep track of authorized tokens
+    address[] private _authorizedTokensList;
 
     /// @notice DAO fees in basis points (BPS) - 10000 = 100%
     uint256 public daoFeesBPS = 50; // 0.5% default
@@ -399,8 +395,8 @@ contract Rent2Repay is AccessControl, Pausable {
      * @return true if authorized for at least one token, false otherwise
      */
     function isAuthorized(address user) public view returns (bool) {
-        for (uint256 i = 0; i < tokenList.length; i++) {
-            if (allowedMaxAmounts[user][tokenList[i].token] > 0) {
+        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            if (allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
                 return true;
             }
         }
@@ -446,7 +442,6 @@ contract Rent2Repay is AccessControl, Pausable {
         // Get the debt token for this token
         address debtToken = tokenToDebtToken[token];
         if (debtToken == address(0)) revert NoDebtTokenAssociated();
-
         // Check 
         uint256 remainingDebt = IERC20(debtToken).balanceOf(user);
         if (remainingDebt == 0) revert("No Debt");
@@ -536,8 +531,8 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 authorizedCount = 0;
         
         // Count authorized tokens for this user
-        for (uint256 i = 0; i < tokenList.length; i++) {
-            if (allowedMaxAmounts[user][tokenList[i].token] > 0) {
+        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            if (allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
                 authorizedCount++;
             }
         }
@@ -548,33 +543,46 @@ contract Rent2Repay is AccessControl, Pausable {
         
         // Fill arrays
         uint256 index = 0;
-        for (uint256 i = 0; i < tokenList.length; i++) {
-            if (allowedMaxAmounts[user][tokenList[i].token] > 0) {
-                tokens[index] = tokenList[i].token;
-                maxAmounts[index] = allowedMaxAmounts[user][tokenList[i].token];
+        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            if (allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
+                tokens[index] = _authorizedTokensList[i];
+                maxAmounts[index] = allowedMaxAmounts[user][_authorizedTokensList[i]];
                 index++;
             }
         }
     }
 
     /**
-     * @notice Gets the list of all authorized tokens
-     * @return Array of authorized token addresses
+     * @notice Gets the list of all authorized tokens and their debt tokens
+     * @return tokens Array of authorized token addresses
+     * @return debtTokens Array of corresponding debt token addresses
      */
-    function getAuthorizedTokens() external view returns (address[] memory) {
-        address[] memory tokenAddresses = new address[](tokenList.length);
-        for (uint256 i = 0; i < tokenList.length; i++) {
-            tokenAddresses[i] = tokenList[i].token;
+    function getAuthorizedTokenPairs() external view returns (
+        address[] memory tokens, 
+        address[] memory debtTokens
+    ) {
+        uint256 count = 0;
+        
+        // Count valid pairs
+        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            address token = _authorizedTokensList[i];
+            if (authorizedTokens[token] && tokenToDebtToken[token] != address(0)) {
+                count++;
+            }
         }
-        return tokenAddresses;
-    }
-
-    /**
-     * @notice Gets the list of all authorized token pairs
-     * @return Array of TokenPair structures containing token and debt token addresses
-     */
-    function getAuthorizedTokenPairs() external view returns (TokenPair[] memory) {
-        return tokenList;
+        
+        tokens = new address[](count);
+        debtTokens = new address[](count);
+        
+        uint256 index = 0;
+        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            address token = _authorizedTokensList[i];
+            if (authorizedTokens[token] && tokenToDebtToken[token] != address(0)) {
+                tokens[index] = token;
+                debtTokens[index] = tokenToDebtToken[token];
+                index++;
+            }
+        }
     }
 
     /**
@@ -584,15 +592,6 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function getDebtToken(address token) external view returns (address) {
         return tokenToDebtToken[token];
-    }
-
-    /**
-     * @notice Gets the token address for a given debt token
-     * @param debtToken The debt token address
-     * @return The token address associated with the debt token
-     */
-    function getTokenFromDebtToken(address debtToken) external view returns (address) {
-        return debtTokenToToken[debtToken];
     }
 
     /**
@@ -606,13 +605,13 @@ contract Rent2Repay is AccessControl, Pausable {
         validTokenAddress(token)
         validTokenAddress(debtToken)
     {
-        if (authorizedTokens[token]) revert TokenAlreadyAuthorized();
         if (tokenToDebtToken[token] != address(0)) revert TokenAlreadyAuthorized();
-        if (debtTokenToToken[debtToken] != address(0)) revert TokenAlreadyAuthorized();
         
-        _authorizeTokenPair(token, debtToken);
+        authorizedTokens[token] = true;
+        tokenToDebtToken[token] = debtToken;
+        _authorizedTokensList.push(token);
+        emit TokenPairAuthorized(token, debtToken);
     }
-
 
     /**
      * @notice Internal function to authorize a token pair
@@ -621,10 +620,35 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function _authorizeTokenPair(address token, address debtToken) internal {
         authorizedTokens[token] = true;
-        tokenList.push(TokenPair({token: token, debtToken: debtToken}));
         tokenToDebtToken[token] = debtToken;
-        debtTokenToToken[debtToken] = token;
+        _authorizedTokensList.push(token);
         emit TokenPairAuthorized(token, debtToken);
+    }
+
+    /**
+     * @notice Allows admins to unauthorize a token
+     * @param token The token address to unauthorize
+     */
+    function unauthorizeToken(address token) 
+        external 
+        onlyRole(ADMIN_ROLE) 
+        validTokenAddress(token) 
+    {
+        if (!authorizedTokens[token]) revert TokenNotAuthorized();
+        
+        authorizedTokens[token] = false;
+        tokenToDebtToken[token] = address(0);
+        
+        // Remove from authorizedTokensList
+        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            if (_authorizedTokensList[i] == token) {
+                _authorizedTokensList[i] = _authorizedTokensList[_authorizedTokensList.length - 1];
+                _authorizedTokensList.pop();
+                break;
+            }
+        }
+        
+        emit TokenUnauthorized(token);
     }
 
     /**
@@ -633,8 +657,8 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function _removeUserAllTokens(address user) internal {
         // NOTE Solidity: key removing is impossible
-        for (uint256 i = 0; i < tokenList.length; i++) {
-            allowedMaxAmounts[user][tokenList[i].token] = 0;
+        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            allowedMaxAmounts[user][_authorizedTokensList[i]] = 0;
         }
         lastRepayTimestamps[user] = 0;
         periodicity[user] = 0;
