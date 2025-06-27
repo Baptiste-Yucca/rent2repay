@@ -17,7 +17,8 @@
     "test:repay": "node scripts/cli/quick-repayment.js",
     "test:concurrency": "node scripts/cli/quick-concurrency.js",
     "test:status": "node scripts/cli/show-status.js",
-    "demo": "node scripts/cli/demo-complete.js"
+    "demo": "node scripts/cli/demo-complete.js",
+    "check:debt": "npx hardhat run scripts/check-debt-balances.js --network localhost"
   },
   "keywords": [],
   "author": "",

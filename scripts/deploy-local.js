@@ -41,13 +41,19 @@ async function main() {
         deployedAddresses.contracts.MockWXDAI = wxdaiAddress;
         console.log("✅ MockWXDAI déployé à:", wxdaiAddress);
 
-        // Déployer un token de gouvernance pour les réductions de frais
-        console.log("🪙 Déploiement de MockDAO Token...");
-        const mockDAOToken = await MockERC20Factory.deploy("Mock DAO Token", "DAO");
+        // Déployer le token de gouvernance à une adresse spécifique
+        console.log("🪙 Déploiement du token de gouvernance à l'adresse spécifique...");
+        const { network } = require("hardhat");
+        const mockDAOFactory = await ethers.getContractFactory("MockERC20");
+        await network.provider.send("hardhat_setCode", [
+            "0x6382856a731Af535CA6aea8D364FCE67457da438",
+            mockDAOFactory.bytecode
+        ]);
+        const daoTokenAddress = "0x6382856a731Af535CA6aea8D364FCE67457da438";
+        const mockDAOToken = mockDAOFactory.attach(daoTokenAddress);
         await mockDAOToken.waitForDeployment();
-        const daoTokenAddress = await mockDAOToken.getAddress();
-        deployedAddresses.contracts.MockDAOToken = daoTokenAddress;
-        console.log("✅ MockDAOToken déployé à:", daoTokenAddress);
+        deployedAddresses.contracts.DAOToken = daoTokenAddress;
+        console.log("✅ Token de gouvernance déployé à l'adresse spécifique:", daoTokenAddress);
 
         // ===== ÉTAPE 2: Déployer les tokens de dette =====
         console.log("\n📝 === ÉTAPE 2: Déploiement des tokens de dette ===");
@@ -111,6 +117,21 @@ async function main() {
         const rent2RepayAddress = await rent2Repay.getAddress();
         deployedAddresses.contracts.Rent2Repay = rent2RepayAddress;
         console.log("✅ Rent2Repay déployé à:", rent2RepayAddress);
+        const deployedUSDCdebtaddr = await rent2Repay.getDebtToken(usdcAddress);
+        const deployedWXDAIdebtaddr = await rent2Repay.getDebtToken(wxdaiAddress);
+
+        console.log(
+            deployedUSDCdebtaddr.toLowerCase() === debtUSDCAddress.toLowerCase()
+                ? "✅ check debtUSDC address"
+                : "❌ check debtUSDC address",
+            deployedUSDCdebtaddr
+        );
+        console.log(
+            deployedWXDAIdebtaddr.toLowerCase() === debtWXDAIAddress.toLowerCase()
+                ? "✅ check debtWXDAI address"
+                : "❌ check debtWXDAI address",
+            deployedWXDAIdebtaddr
+        );
 
         // ===== ÉTAPE 5: Configuration initiale =====
         console.log("\n📝 === ÉTAPE 5: Configuration initiale ===");
@@ -125,6 +146,16 @@ async function main() {
         // Configurer le token de réduction des frais DAO
         await rent2Repay.updateDaoFeeReductionToken(daoTokenAddress);
         console.log("✅ Token de réduction des frais DAO configuré:", daoTokenAddress);
+
+        // Vérification de la configuration du token de gouvernance
+        const daoConfig = await rent2Repay.getDaoFeeReductionConfiguration();
+        console.log(
+            daoConfig.token.toLowerCase() === daoTokenAddress.toLowerCase()
+                ? "✅ Vérification du token de gouvernance: Configuration correcte"
+                : "❌ Vérification du token de gouvernance: ERREUR DE CONFIGURATION",
+            "\n   → Attendu:", daoTokenAddress,
+            "\n   → Reçu:", daoConfig.token
+        );
 
         // Configurer le montant minimum pour la réduction des frais (1000 tokens)
         const minAmountForFeeReduction = ethers.parseEther("1000");
@@ -177,7 +208,7 @@ async function main() {
     console.log("🏗️ MockRMM:", deployedAddresses.contracts.MockRMM);
     console.log("🪙 MockUSDC:", deployedAddresses.contracts.MockUSDC);
     console.log("🪙 MockWXDAI:", deployedAddresses.contracts.MockWXDAI);
-    console.log("🪙 MockDAOToken:", deployedAddresses.contracts.MockDAOToken);
+    console.log("🪙 MockDAOToken:", deployedAddresses.contracts.DAOToken);
     console.log("🏦 MockDebtUSDC:", deployedAddresses.contracts.MockDebtUSDC);
     console.log("🏦 MockDebtWXDAI:", deployedAddresses.contracts.MockDebtWXDAI);
 
