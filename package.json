@@ -18,7 +18,8 @@
     "test:concurrency": "node scripts/cli/quick-concurrency.js",
     "test:status": "node scripts/cli/show-status.js",
     "demo": "node scripts/cli/demo-complete.js",
-    "check:debt": "npx hardhat run scripts/check-debt-balances.js --network localhost"
+    "check:debt": "npx hardhat run scripts/check-debt-balances.js --network localhost",
+    "whois": "npx hardhat run scripts/whois.js --network localhost"
   },
   "keywords": [],
   "author": "",

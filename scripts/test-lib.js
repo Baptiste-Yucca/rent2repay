@@ -252,8 +252,7 @@ const QuickTest = {
         try {
             const tx = await rent2RepayAsRunner.rent2repay(
                 user.address,
-                addresses.MockUSDC,
-                ethers.parseEther("100")
+                addresses.MockUSDC
             );
 
             const receipt = await tx.wait();
@@ -297,8 +296,8 @@ const QuickTest = {
 
         try {
             const [tx1, tx2] = await Promise.allSettled([
-                rent2RepayAsRunner1.rent2repay(user.address, addresses.MockUSDC, amount),
-                rent2RepayAsRunner2.rent2repay(user.address, addresses.MockUSDC, amount)
+                rent2RepayAsRunner1.rent2repay(user.address, addresses.MockUSDC),
+                rent2RepayAsRunner2.rent2repay(user.address, addresses.MockUSDC)
             ]);
 
             console.log("📊 Résultats de concurrence:");

@@ -102,7 +102,7 @@ node repay-script.js 25 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 0x70997970C51
 
 3. **N'importe qui** peut déclencher un remboursement :
    ```javascript
-   rent2repay.rent2repay(user1, token, montant)
+   rent2repay.rent2repay(user1, token)
    ```
 
 4. Le système vérifie les limites et rembourse automatiquement via le RMM

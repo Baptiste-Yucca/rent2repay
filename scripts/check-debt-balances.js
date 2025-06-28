@@ -69,9 +69,14 @@ async function main() {
     const rent2Repay = await ethers.getContractAt("Rent2Repay", config.contracts.Rent2Repay);
 
     // Configurer une limite hebdomadaire de 100 USDC
-    const weeklyLimit = ethers.parseEther("100");
-    const periodicity = 10; // 10 secondes pour le test
+    const weeklyLimit = BigInt(10_000_000);
+    const periodicity = 1; // 10 secondes pour le test
     console.log("   👉 Configuration de la limite hebdomadaire...");
+
+    let [maxAmount, lastRepay] = await rent2Repay.getUserConfigForToken(signers[1], config.contracts.MockUSDC);
+    console.log('Max set: ', maxAmount);
+
+    await rent2Repay.revokeRent2RepayForToken(config.contracts.MockUSDC);
 
     try {
         await rent2Repay.connect(signers[1]).configureRent2Repay(
@@ -85,6 +90,18 @@ async function main() {
         return;
     }
 
+    [maxAmount, lastRepay] = await rent2Repay.getUserConfigForToken(signers[1], config.contracts.MockUSDC);
+    console.log('Max set: ', maxAmount);
+
+    // Approuver le contrat Rent2Repay pour 52 fois le montant configuré (USDC avec 6 décimales)
+    console.log("   👉 Approbation du contrat Rent2Repay pour 52x le montant configuré...");
+    const approveAmount = BigInt(weeklyLimit) * BigInt(52); // 52 fois le montant configuré
+    await mockUSDC.connect(signers[1]).approve(await rent2Repay.getAddress(), approveAmount);
+    console.log(`   ✅ Approbation de ${approveAmount} USDC  au contrat Rent2Repay`);
+
+    await new Promise(resolve => setTimeout(resolve, periodicity * 1000));
+
+
     // Effectuer un remboursement via RUNNER_1
     console.log("\n🔄 Test de remboursement avec RUNNER_1...");
     const runner1 = signers[2]; // RUNNER_1 à l'index 2
@@ -92,9 +109,8 @@ async function main() {
     // Montant à rembourser
     const repayAmount = ethers.parseEther("10");
 
-    // Approuver le contrat Rent2Repay pour le token USDC au nom de l'utilisateur
-    console.log("   👉 Approbation du contrat Rent2Repay pour USDC...");
-    await mockUSDC.connect(signers[1]).approve(await rent2Repay.getAddress(), repayAmount);
+    // L'approbation a déjà été faite plus haut pour 52x le montant configuré
+    console.log("   👉 Utilisation de l'approbation déjà accordée...");
 
     try {
         console.log("   👉 Tentative de remboursement de 10 USDC...");
@@ -123,7 +139,6 @@ async function main() {
         const tx = await rent2Repay.connect(runner1).rent2repay(
             userAddress.toLowerCase(),           // adresse de l'utilisateur (index 1)
             "0x5FbDB2315678afecb367f032d93F642f64180aa3".toLowerCase(), //config.contracts.MockUSDC.toLowerCase(),  // adresse du token USDC
-            repayAmount           // montant à rembourser
         );
         await tx.wait();
         console.log("   ✅ Remboursement effectué avec succès!");

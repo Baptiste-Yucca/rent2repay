@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IRMM.sol";
+// Import pour le debugging - à retirer en production
+import "hardhat/console.sol";
 
 /**
  * @title Rent2Repay
@@ -262,16 +264,6 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
-     * @notice Validates that a user has configured Rent2Repay for a specific token
-     * @param user The user address to validate
-     * @param token The token address to validate
-     */
-    modifier userIsAuthorizedForToken(address user, address token) {
-        if (!isAuthorizedForToken(user, token)) revert UserNotAuthorizedForToken();
-        _;
-    }
-
-    /**
      * @notice Validates that an address is not the zero address
      * @param addr The address to validate
      */
@@ -345,12 +337,11 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function revokeRent2RepayForToken(address token) 
         external 
-        validTokenAddress(token)
-        userIsAuthorizedForToken(msg.sender, token) 
     {
-        allowedMaxAmounts[msg.sender][token] = 0;
-        
-        emit Rent2RepayRevoked(msg.sender, token);
+        if (allowedMaxAmounts[msg.sender][token] != 0 ){
+            allowedMaxAmounts[msg.sender][token] = 0;
+            emit Rent2RepayRevoked(msg.sender, token);
+        }
     }
 
     /**
@@ -419,30 +410,33 @@ contract Rent2Repay is AccessControl, Pausable {
      * @dev This function can be called by anyone to execute automatic repayments
      * @param user Address of the user for whom to execute the repayment
      * @param token Address of the token to use for repayment
-     * @param amount Amount to be repaid
      * @return true if the repayment is authorized and limits updated
      */
-    function rent2repay(address user, address token, uint256 amount) 
+    function rent2repay(address user, address token) 
         external 
         whenNotPaused
         validAddress(user)
         validTokenAddress(token)
         onlyAuthorizedToken(token)
         notSelf(user)
-        userIsAuthorizedForToken(user, token) 
         returns (bool) 
     {
         // security
         if (allowedMaxAmounts[user][token] == 0) revert("User not configured for token");
         if (periodicity[user] == 0) revert("Periodicity not set");
-        if (amount == 0) revert("Amount must be greater than zero");
 
         if(_isNewPeriod(user) == false) revert("wait next period");
 
+        // Debug: Affichage du token en cours de traitement
+        console.log("Token:", token);
+        uint256 amount = allowedMaxAmounts[user][token];
+        console.log("Amount:", amount);
         // Get the debt token for this token
         address debtToken = tokenToDebtToken[token];
         if (debtToken == address(0)) revert NoDebtTokenAssociated();
         // Check 
+        console.log("DebtToken:", debtToken);
+
         uint256 remainingDebt = IERC20(debtToken).balanceOf(user);
         if (remainingDebt == 0) revert("No Debt");
 
@@ -493,19 +487,28 @@ contract Rent2Repay is AccessControl, Pausable {
         return true;
     }
 
+    function whoami() external view returns (bool isAdmin, bool isOperator, bool isEmergency) {
+        address sender = msg.sender;
+        return (
+          hasRole(DEFAULT_ADMIN_ROLE, sender),
+          hasRole(OPERATOR_ROLE, sender),
+          hasRole(EMERGENCY_ROLE, sender)
+        );
+    }
+
     /**
      * @notice Retrieves a user's configuration for a specific token
      * @param user Address of the user
      * @param token Address of the token
-     * @return weeklyMaxAmount The maximum amount per week for this token
+     * @return MaxAmount The maximum amount per week for this token
      * @return lastRepayTimestamp Timestamp of the last repayment (shared across tokens)
      */
     function getUserConfigForToken(address user, address token) 
         external 
         view 
         returns (
-            uint256 weeklyMaxAmount,
-            uint256 lastRepayTimestamp
+            uint256,
+            uint256
         ) 
     {
         return (
