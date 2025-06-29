@@ -36,7 +36,7 @@ async function loadContracts() {
         // Tokens de test
         mockUSDC: await ethers.getContractAt("MockERC20", config.contracts.MockUSDC),
         mockWXDAI: await ethers.getContractAt("MockERC20", config.contracts.MockWXDAI),
-        mockDAOToken: await ethers.getContractAt("MockERC20", config.contracts.MockDAOToken),
+        mockDAOToken: await ethers.getContractAt("MockERC20", config.contracts.DAOToken),
 
         // Tokens de dette
         mockDebtUSDC: await ethers.getContractAt("MockDebtToken", config.contracts.MockDebtUSDC),
