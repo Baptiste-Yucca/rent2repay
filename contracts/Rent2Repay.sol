@@ -437,14 +437,17 @@ contract Rent2Repay is AccessControl, Pausable {
         // Check 
         console.log("DebtToken:", debtToken);
 
-        uint256 remainingDebt = IERC20(debtToken).balanceOf(user);
-        if (remainingDebt == 0) revert("No Debt");
+        //uint256 remainingDebt = IERC20(debtToken).balanceOf(user);
+        //if (remainingDebt == 0) revert("No Debt");
 
         uint256 toRepay = amount;
-        if(remainingDebt < amount) toRepay = remainingDebt;
+        //if(remainingDebt < amount) toRepay = remainingDebt;
 
         // Transfer tokens from user to contract first
-        IERC20(token).transferFrom(user, address(this), toRepay);
+        require(
+            IERC20(token).transferFrom(user, address(this), toRepay),
+            "transferFrom to R2R failed"
+        );
 
         // Calculate fees
         uint256 daoFees;
@@ -455,6 +458,7 @@ contract Rent2Repay is AccessControl, Pausable {
         // Transfer fees to respective addresses
         _transferFees(token, daoFees, senderTips);
         
+        require(IERC20(token).approve(address(rmm), amountForRepayment), "Approve failed");
         // Call RMM repay function with the amount minus fees
         uint256 actualAmountRepaid = rmm.repay(
             token,
@@ -697,14 +701,14 @@ contract Rent2Repay is AccessControl, Pausable {
         // Check if user qualifies for DAO fee reduction
         // cas si amount > totalfees divison euclidiennes??
         //
-        if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
-            uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
-            if (userBalance >= daoFeeReductionMinimumAmount) {
-                // Reduce DAO fees by the configured percentage (BPS)
-                uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
-                daoFees = daoFees - reductionAmount;
-            }
-        }
+        //if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
+        //    uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
+        //    if (userBalance >= daoFeeReductionMinimumAmount) {
+        //        // Reduce DAO fees by the configured percentage (BPS)
+        //        uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
+        //        daoFees = daoFees - reductionAmount;
+        //    }
+        //}
         
         uint256 totalFees = daoFees + senderTips;   
         // SECU to move on main fct ? if fees > 100 revert
@@ -894,11 +898,11 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function _transferFees(address token, uint256 daoFees, uint256 senderTips) internal {
         if (daoFees > 0 && daoTreasuryAddress != address(0)) {
-            IERC20(token).transfer(daoTreasuryAddress, daoFees);
+            require(IERC20(token).transfer(daoTreasuryAddress, daoFees), "Transfer to DAO failed");
         }
         
         if (senderTips > 0) {
-            IERC20(token).transfer(msg.sender, senderTips);
+            require(IERC20(token).transfer(msg.sender, senderTips), "Transfer to sender failed");
         }
     }
 } 

@@ -41,6 +41,34 @@ Le script génère un fichier `deployed-contracts.json` à la racine du projet c
 npx hardhat run scripts/test-utils.js --network localhost
 ```
 
+### Test de gestion des fees et changements de rôles 💰
+
+```bash
+# Tester complètement la gestion des fees et des rôles admin
+npx hardhat run scripts/test-fees-management.js --network localhost
+```
+
+Ce script effectue un test complet en 10 étapes :
+
+1. **🔍 Vérification des rôles admin** - Affiche qui peut changer les fees
+2. **💸 Affichage des fees actuelles** - Logs des fees DAO et tips runner en BPS
+3. **⚡ Modification des fees** - Multiplie par 2 les fees DAO, par 3 les tips runner
+4. **✔️ Vérification des changements** - Confirme que les modifications sont appliquées
+5. **👑 Changement d'admin** - Transfert des rôles vers l'adresse #10
+6. **🔍 Vérification whoami** - Confirme les nouveaux rôles avec `whoami()`
+7. **🚫 Test restriction ancienne adresse** - Vérifie qu'elle ne peut plus modifier
+8. **✅ Test nouvelle adresse** - Divise par 2 les fees DAO, par 3 les tips runner
+9. **🔍 Vérification finale** - Confirme les derniers changements
+10. **🔄 Restauration admin initial** - Remet l'adresse originale en admin
+
+**Fonctionnalités testées :**
+- Gestion des rôles `ADMIN_ROLE` et `DEFAULT_ADMIN_ROLE`
+- Modification des fees DAO (`daoFeesBPS`)
+- Modification des tips runner (`senderTipsBPS`)
+- Sécurité des permissions
+- Transfert et révocation de rôles
+- Validation des limites (max 100% de fees totales)
+
 ### Utilisation des utilitaires en ligne de commande
 
 ```bash

@@ -50,10 +50,10 @@ contract MockRMM is IRMM {
         
         // Simuler le remboursement en transférant les debt tokens vers l'adresse 0
         // (équivalent à les brûler)
-        IERC20(debtToken).transferFrom(onBehalfOf, address(0), amount);
+        require(IERC20(debtToken).transferFrom(onBehalfOf, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
         
         // Transférer les tokens de remboursement vers ce contrat (simulation)
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
+        require(IERC20(asset).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
         
         emit Repaid(asset, amount, interestRateMode, onBehalfOf);
         return amount;

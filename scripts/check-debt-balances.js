@@ -68,6 +68,18 @@ async function main() {
     console.log("🔧 Configuration de Rent2Repay pour l'utilisateur...");
     const rent2Repay = await ethers.getContractAt("Rent2Repay", config.contracts.Rent2Repay);
 
+    // Vérifier et configurer l'adresse DAO treasury si nécessaire
+    console.log("   👉 Vérification de l'adresse DAO treasury...");
+    const daoConfig = await rent2Repay.getDaoFeeReductionConfiguration();
+    if (daoConfig.treasuryAddress === ethers.ZeroAddress) {
+        console.log("   ⚠️ Adresse DAO treasury non définie, configuration avec l'adresse #10...");
+        const daoTreasuryAddress = signers[10].address;
+        await rent2Repay.updateDaoTreasuryAddress(daoTreasuryAddress);
+        console.log(`   ✅ Adresse DAO treasury configurée: ${daoTreasuryAddress}`);
+    } else {
+        console.log(`   ✅ Adresse DAO treasury déjà configurée: ${daoConfig.treasuryAddress}`);
+    }
+
     // Configurer une limite hebdomadaire de 100 USDC
     const weeklyLimit = BigInt(10_000_000);
     const periodicity = 1; // 10 secondes pour le test
@@ -93,11 +105,40 @@ async function main() {
     [maxAmount, lastRepay] = await rent2Repay.getUserConfigForToken(signers[1], config.contracts.MockUSDC);
     console.log('Max set: ', maxAmount);
 
-    // Approuver le contrat Rent2Repay pour 52 fois le montant configuré (USDC avec 6 décimales)
-    console.log("   👉 Approbation du contrat Rent2Repay pour 52x le montant configuré...");
-    const approveAmount = BigInt(weeklyLimit) * BigInt(52); // 52 fois le montant configuré
-    await mockUSDC.connect(signers[1]).approve(await rent2Repay.getAddress(), approveAmount);
-    console.log(`   ✅ Approbation de ${approveAmount} USDC  au contrat Rent2Repay`);
+    // Approuver le contrat Rent2Repay avec allowance maximale
+    console.log("   👉 Approbation du contrat Rent2Repay avec allowance maximale...");
+    const rent2RepayAddress = await rent2Repay.getAddress();
+    const currentUSDCAllowance = await mockUSDC.allowance(userAddress, rent2RepayAddress);
+
+    if (currentUSDCAllowance < ethers.MaxUint256) {
+        await mockUSDC.connect(signers[1]).approve(rent2RepayAddress, ethers.MaxUint256);
+        console.log(`   ✅ Approbation maximale USDC accordée au contrat Rent2Repay`);
+    } else {
+        console.log(`   ✅ Approbation USDC déjà maximale pour Rent2Repay`);
+    }
+
+    // Approuver le MockRMM pour les debt tokens (nécessaire pour le burn simulé)
+    console.log("   👉 Vérification des approbations debt tokens vers MockRMM...");
+    const mockRMM = await ethers.getContractAt("MockRMM", config.contracts.MockRMM);
+    const mockRMMAddress = await mockRMM.getAddress();
+
+    // Approbation debt USDC vers MockRMM
+    const currentDebtUSDCAllowance = await mockDebtUSDC.allowance(userAddress, mockRMMAddress);
+    if (currentDebtUSDCAllowance < ethers.MaxUint256) {
+        await mockDebtUSDC.connect(signers[1]).approve(mockRMMAddress, ethers.MaxUint256);
+        console.log(`   ✅ Approbation maximale debt USDC accordée au MockRMM`);
+    } else {
+        console.log(`   ✅ Approbation debt USDC déjà maximale pour MockRMM`);
+    }
+
+    // Approbation debt WXDAI vers MockRMM
+    const currentDebtWXDAIAllowance = await mockDebtWXDAI.allowance(userAddress, mockRMMAddress);
+    if (currentDebtWXDAIAllowance < ethers.MaxUint256) {
+        await mockDebtWXDAI.connect(signers[1]).approve(mockRMMAddress, ethers.MaxUint256);
+        console.log(`   ✅ Approbation maximale debt WXDAI accordée au MockRMM`);
+    } else {
+        console.log(`   ✅ Approbation debt WXDAI déjà maximale pour MockRMM`);
+    }
 
     await new Promise(resolve => setTimeout(resolve, periodicity * 1000));
 
@@ -133,7 +174,8 @@ async function main() {
 
         // 4. Vérifier l'allowance
         const allowance = await mockUSDC.allowance(userAddress, await rent2Repay.getAddress());
-        console.log(`      - Allowance USDC: ${ethers.formatEther(allowance)}`);
+        const isMaxAllowance = allowance === ethers.MaxUint256;
+        console.log(`      - Allowance USDC: ${isMaxAllowance ? 'MAX (illimitée)' : allowance.toString()}`);
 
         // Tentative de remboursement
         const tx = await rent2Repay.connect(runner1).rent2repay(
