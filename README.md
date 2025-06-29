@@ -43,6 +43,12 @@ Teste les rôles (admin, operator, emergency) pour les 10 premières adresses Ha
 npx hardhat run scripts/test-whoami.js --network localhost
 ```
 
+### Test de configuration puis révocation
+Valide la configuration puis la révocation pour l'utilisateur 1 (fait l'inverse de l'état actuel) :
+```bash
+npx hardhat run scripts/test-configure-then-revoke.js --network localhost
+```
+
 ### Vérification d'un wallet
 ```bash
 cd test/front_local
