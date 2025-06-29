@@ -37,6 +37,12 @@ Les adresses sont automatiquement mises à jour dans `config.js` et `test/front_
 
 ## 🔧 Scripts Utiles
 
+### Test de la fonction whoami
+Teste les rôles (admin, operator, emergency) pour les 10 premières adresses Hardhat :
+```bash
+npx hardhat run scripts/test-whoami.js --network localhost
+```
+
 ### Vérification d'un wallet
 ```bash
 cd test/front_local
