@@ -2,26 +2,26 @@
   "network": "localhost",
   "chainId": 31337,
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "deployedAt": "2025-06-29T18:56:25.065Z",
+  "deployedAt": "2025-06-29T21:46:26.344Z",
   "contracts": {
     "MockUSDC": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     "MockWXDAI": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    "DAOToken": "0x6382856a731Af535CA6aea8D364FCE67457da438",
-    "MockDebtUSDC": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-    "MockDebtWXDAI": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-    "MockRMM": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-    "Rent2Repay": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+    "MockDAOToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "MockDebtUSDC": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    "MockDebtWXDAI": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "MockRMM": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+    "Rent2Repay": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
   },
   "tokenPairs": [
     {
       "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "debtToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "debtToken": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
       "name": "USDC",
       "symbol": "USDC"
     },
     {
       "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-      "debtToken": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "debtToken": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
       "name": "WXDAI",
       "symbol": "WXDAI"
     }
@@ -32,6 +32,6 @@
     "daoFeeReductionBPS": 5000,
     "daoFeeReductionMinimumAmount": "1000000000000000000000",
     "daoTreasuryAddress": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-    "daoFeeReductionTokenAddress": "0x6382856a731Af535CA6aea8D364FCE67457da438"
+    "daoFeeReductionTokenAddress": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
   }
 }

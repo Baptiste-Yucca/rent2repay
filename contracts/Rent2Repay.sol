@@ -695,20 +695,24 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 amountForRepayment
     ) {
         // Calculate base fees
+        console.log("start calculate fees");
         daoFees = (amount * daoFeesBPS) / 10000;
         senderTips = (amount * senderTipsBPS) / 10000;
         
         // Check if user qualifies for DAO fee reduction
         // cas si amount > totalfees divison euclidiennes??
         //
-        //if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
-        //    uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
-        //    if (userBalance >= daoFeeReductionMinimumAmount) {
-        //        // Reduce DAO fees by the configured percentage (BPS)
-        //        uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
-        //        daoFees = daoFees - reductionAmount;
-        //    }
-        //}
+        if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
+            console.log("daoFeeReductionToken", daoFeeReductionToken);
+            console.log("daoFeeReductionMinimumAmount", daoFeeReductionMinimumAmount);
+            uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
+            if (userBalance >= daoFeeReductionMinimumAmount) {
+                // Reduce DAO fees by the configured percentage (BPS)
+                uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
+                daoFees = daoFees - reductionAmount;
+            }
+            console.log("daoFees", daoFees);
+        }
         
         uint256 totalFees = daoFees + senderTips;   
         // SECU to move on main fct ? if fees > 100 revert

@@ -41,19 +41,13 @@ async function main() {
         deployedAddresses.contracts.MockWXDAI = wxdaiAddress;
         console.log("✅ MockWXDAI déployé à:", wxdaiAddress);
 
-        // Déployer le token de gouvernance à une adresse spécifique
-        console.log("🪙 Déploiement du token de gouvernance à l'adresse spécifique...");
-        const { network } = require("hardhat");
-        const mockDAOFactory = await ethers.getContractFactory("MockERC20");
-        await network.provider.send("hardhat_setCode", [
-            "0x6382856a731Af535CA6aea8D364FCE67457da438",
-            mockDAOFactory.bytecode
-        ]);
-        const daoTokenAddress = "0x6382856a731Af535CA6aea8D364FCE67457da438";
-        const mockDAOToken = mockDAOFactory.attach(daoTokenAddress);
+        // Déployer MockDAOToken
+        console.log("🪙 Déploiement de MockDAOToken...");
+        const mockDAOToken = await MockERC20Factory.deploy("Mock DAO Token", "DAO");
         await mockDAOToken.waitForDeployment();
-        deployedAddresses.contracts.DAOToken = daoTokenAddress;
-        console.log("✅ Token de gouvernance déployé à l'adresse spécifique:", daoTokenAddress);
+        const daoTokenAddress = await mockDAOToken.getAddress();
+        deployedAddresses.contracts.MockDAOToken = daoTokenAddress;
+        console.log("✅ MockDAOToken déployé à:", daoTokenAddress);
 
         // ===== ÉTAPE 2: Déployer les tokens de dette =====
         console.log("\n📝 === ÉTAPE 2: Déploiement des tokens de dette ===");
@@ -162,6 +156,39 @@ async function main() {
         await rent2Repay.updateDaoFeeReductionMinimumAmount(minAmountForFeeReduction);
         console.log("✅ Montant minimum pour réduction des frais configuré:", ethers.formatEther(minAmountForFeeReduction));
 
+        // === VÉRIFICATIONS DE CONFIGURATION ===
+        console.log("\n🔍 === VÉRIFICATIONS DE CONFIGURATION ===");
+
+        // Vérifier que la configuration complète de réduction des frais DAO est correcte
+        const finalDaoConfig = await rent2Repay.getDaoFeeReductionConfiguration();
+
+        console.log("📋 Configuration finale de réduction des frais DAO:");
+        console.log(`   🪙 Token de réduction: ${finalDaoConfig.token}`);
+        console.log(`   💰 Montant minimum: ${finalDaoConfig.minimumAmount} wei (${ethers.formatEther(finalDaoConfig.minimumAmount)} tokens)`);
+        console.log(`   📊 Pourcentage de réduction: ${finalDaoConfig.reductionPercentage} BPS (${Number(finalDaoConfig.reductionPercentage) / 100}%)`);
+        console.log(`   🏦 Adresse treasury: ${finalDaoConfig.treasuryAddress}`);
+
+        // Vérifications de sécurité
+        const configChecks = {
+            tokenSet: finalDaoConfig.token !== ethers.ZeroAddress,
+            minimumAmountSet: finalDaoConfig.minimumAmount > 0n,
+            treasurySet: finalDaoConfig.treasuryAddress !== ethers.ZeroAddress,
+            reductionPercentageValid: finalDaoConfig.reductionPercentage > 0n && finalDaoConfig.reductionPercentage <= 10000n
+        };
+
+        console.log("\n✅ Checks de configuration:");
+        console.log(`   ${configChecks.tokenSet ? '✅' : '❌'} Token de réduction défini: ${configChecks.tokenSet}`);
+        console.log(`   ${configChecks.minimumAmountSet ? '✅' : '❌'} Montant minimum défini: ${configChecks.minimumAmountSet}`);
+        console.log(`   ${configChecks.treasurySet ? '✅' : '❌'} Adresse treasury définie: ${configChecks.treasurySet}`);
+        console.log(`   ${configChecks.reductionPercentageValid ? '✅' : '❌'} Pourcentage de réduction valide: ${configChecks.reductionPercentageValid}`);
+
+        const allConfigValid = Object.values(configChecks).every(check => check === true);
+        console.log(`\n${allConfigValid ? '🎉' : '⚠️'} Configuration des frais DAO: ${allConfigValid ? 'COMPLÈTE ET VALIDE' : 'INCOMPLÈTE OU INVALIDE'}`);
+
+        if (!allConfigValid) {
+            console.warn("⚠️ ATTENTION: La configuration des frais DAO n'est pas complète. Certaines fonctionnalités pourraient ne pas fonctionner.");
+        }
+
         // Ajouter des informations de liaison pour les tests
         deployedAddresses.tokenPairs = [
             {
@@ -178,15 +205,26 @@ async function main() {
             }
         ];
 
-        // Ajouter des informations de configuration
+        // Récupérer la configuration réelle depuis le contrat pour la sauvegarder
+        const [actualDaoFees, actualSenderTips] = await rent2Repay.getFeeConfiguration();
+        const actualDaoConfig = await rent2Repay.getDaoFeeReductionConfiguration();
+
         deployedAddresses.configuration = {
-            daoFeesBPS: 50, // 0.5%
-            senderTipsBPS: 25, // 0.25%
-            daoFeeReductionBPS: 5000, // 50%
-            daoFeeReductionMinimumAmount: minAmountForFeeReduction.toString(),
-            daoTreasuryAddress: deployer.address,
-            daoFeeReductionTokenAddress: daoTokenAddress
+            daoFeesBPS: Number(actualDaoFees),
+            senderTipsBPS: Number(actualSenderTips),
+            daoFeeReductionBPS: Number(actualDaoConfig.reductionPercentage),
+            daoFeeReductionMinimumAmount: actualDaoConfig.minimumAmount.toString(),
+            daoTreasuryAddress: actualDaoConfig.treasuryAddress,
+            daoFeeReductionTokenAddress: actualDaoConfig.token
         };
+
+        console.log("\n📊 Configuration sauvegardée (valeurs réelles du contrat):");
+        console.log(`   💰 DAO Fees: ${deployedAddresses.configuration.daoFeesBPS} BPS`);
+        console.log(`   🎁 Sender Tips: ${deployedAddresses.configuration.senderTipsBPS} BPS`);
+        console.log(`   📉 Réduction DAO: ${deployedAddresses.configuration.daoFeeReductionBPS} BPS`);
+        console.log(`   💎 Montant minimum: ${deployedAddresses.configuration.daoFeeReductionMinimumAmount} wei`);
+        console.log(`   🪙 Token réduction: ${deployedAddresses.configuration.daoFeeReductionTokenAddress}`);
+        console.log(`   🏦 Treasury: ${deployedAddresses.configuration.daoTreasuryAddress}`);
 
         console.log("\n✅ === DÉPLOIEMENT TERMINÉ AVEC SUCCÈS ===");
 
@@ -208,7 +246,7 @@ async function main() {
     console.log("🏗️ MockRMM:", deployedAddresses.contracts.MockRMM);
     console.log("🪙 MockUSDC:", deployedAddresses.contracts.MockUSDC);
     console.log("🪙 MockWXDAI:", deployedAddresses.contracts.MockWXDAI);
-    console.log("🪙 MockDAOToken:", deployedAddresses.contracts.DAOToken);
+    console.log("🪙 MockDAOToken:", deployedAddresses.contracts.MockDAOToken);
     console.log("🏦 MockDebtUSDC:", deployedAddresses.contracts.MockDebtUSDC);
     console.log("🏦 MockDebtWXDAI:", deployedAddresses.contracts.MockDebtWXDAI);
 

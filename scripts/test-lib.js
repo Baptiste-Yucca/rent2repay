@@ -172,7 +172,7 @@ async function loadTestEnvironment() {
         mockRMM: await ethers.getContractAt("MockRMM", config.contracts.MockRMM),
         mockUSDC: await ethers.getContractAt("MockERC20", config.contracts.MockUSDC),
         mockWXDAI: await ethers.getContractAt("MockERC20", config.contracts.MockWXDAI),
-        mockDAOToken: await ethers.getContractAt("MockERC20", config.contracts.DAOToken),
+        mockDAOToken: await ethers.getContractAt("MockERC20", config.contracts.MockDAOToken),
         mockDebtUSDC: await ethers.getContractAt("MockDebtToken", config.contracts.MockDebtUSDC),
         mockDebtWXDAI: await ethers.getContractAt("MockDebtToken", config.contracts.MockDebtWXDAI),
     };
