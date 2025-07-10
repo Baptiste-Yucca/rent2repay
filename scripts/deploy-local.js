@@ -96,13 +96,13 @@ async function main() {
         // Préparer les tableaux pour le constructeur (SEULEMENT LES STABLECOINS ONT DES DEBT TOKENS)
         const tokens = [usdcAddress, wxdaiAddress];
         const debtTokens = [debtUSDCAddress, debtWXDAIAddress];
+        const supplyTokens = [armmUSDCAddress, armmWXDAIAddress]; // Supply tokens pour les withdrawals
 
         console.log("📋 Configuration des paires:");
-        console.log("   - USDC:", usdcAddress, "-> DebtUSDC:", debtUSDCAddress);
-        console.log("   - WXDAI:", wxdaiAddress, "-> DebtWXDAI:", debtWXDAIAddress);
-        console.log("   - armmUSDC et armmWXDAI sont des tokens de supply, pas de debt tokens associés");
+        console.log("   - USDC:", usdcAddress, "-> DebtUSDC:", debtUSDCAddress, "-> SupplyUSDC:", armmUSDCAddress);
+        console.log("   - WXDAI:", wxdaiAddress, "-> DebtWXDAI:", debtWXDAIAddress, "-> SupplyWXDAI:", armmWXDAIAddress);
 
-        const mockRMM = await MockRMMFactory.deploy(tokens, debtTokens);
+        const mockRMM = await MockRMMFactory.deploy(tokens, debtTokens, supplyTokens);
         await mockRMM.waitForDeployment();
         const rmmAddress = await mockRMM.getAddress();
         deployedAddresses.contracts.MockRMM = rmmAddress;
@@ -114,7 +114,7 @@ async function main() {
         const Rent2RepayFactory = await ethers.getContractFactory("Rent2Repay");
         console.log("🏠 Déploiement de Rent2Repay...");
 
-        // Le constructeur attend: admin, emergency, operator, rmm, wxdaiToken, wxdaiDebtToken, usdcToken, usdcDebtToken
+        // Le constructeur attend: admin, emergency, operator, rmm, wxdaiToken, wxdaiDebtToken, wxdaiArmmToken, usdcToken, usdcDebtToken, usdcArmmToken
         const rent2Repay = await Rent2RepayFactory.deploy(
             deployer.address, // admin
             deployer.address, // emergency
@@ -122,8 +122,10 @@ async function main() {
             rmmAddress, // rmm
             wxdaiAddress, // wxdaiToken
             debtWXDAIAddress, // wxdaiDebtToken
+            armmWXDAIAddress, // wxdaiArmmToken
             usdcAddress, // usdcToken
-            debtUSDCAddress // usdcDebtToken
+            debtUSDCAddress, // usdcDebtToken
+            armmUSDCAddress // usdcArmmToken
         );
         await rent2Repay.waitForDeployment();
         const rent2RepayAddress = await rent2Repay.getAddress();
