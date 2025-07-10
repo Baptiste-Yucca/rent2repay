@@ -108,6 +108,25 @@ async function main() {
         deployedAddresses.contracts.MockRMM = rmmAddress;
         console.log("✅ MockRMM déployé à:", rmmAddress);
 
+        // ===== ÉTAPE 3.5: Approvisionnement du MockRMM =====
+        console.log("\n💰 === ÉTAPE 3.5: Approvisionnement du MockRMM en liquidité ===");
+
+        // Mint 100000 USDC au MockRMM (6 decimales)
+        const usdcAmount = ethers.parseUnits("100000", 6);
+        await mockUSDC.mint(rmmAddress, usdcAmount);
+        console.log(`✅ ${ethers.formatUnits(usdcAmount, 6)} USDC (${usdcAmount} Wei) mintés au MockRMM`);
+
+        // Mint 100000 WXDAI au MockRMM (18 decimales)
+        const wxdaiAmount = ethers.parseUnits("100000", 18);
+        await mockWXDAI.mint(rmmAddress, wxdaiAmount);
+        console.log(`✅ ${ethers.formatUnits(wxdaiAmount, 18)} WXDAI (${wxdaiAmount} Wei) mintés au MockRMM`);
+
+        // Vérifier les balances
+        const rmmUsdcBalance = await mockUSDC.balanceOf(rmmAddress);
+        const rmmWxdaiBalance = await mockWXDAI.balanceOf(rmmAddress);
+        console.log(`📊 Balance MockRMM USDC: ${ethers.formatUnits(rmmUsdcBalance, 6)} USDC (${rmmUsdcBalance} Wei)`);
+        console.log(`📊 Balance MockRMM WXDAI: ${ethers.formatUnits(rmmWxdaiBalance, 18)} WXDAI (${rmmWxdaiBalance} Wei)`);
+
         // ===== ÉTAPE 4: Déployer le contrat principal Rent2Repay =====
         console.log("\n📝 === ÉTAPE 4: Déploiement du contrat Rent2Repay ===");
 
