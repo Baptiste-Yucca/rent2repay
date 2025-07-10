@@ -12,9 +12,10 @@ import "../interfaces/IRMM.sol";
 contract MockRMM is IRMM {
     // Mapping token => debtToken pour simuler la liaison entre les tokens
     mapping(address => address) public tokenToDebtToken;
+    mapping(address => address) public tokenToSupplyToken;
 
     event Repaid(address token, uint256 amount, uint256 mode, address user);
-
+    event RepaidWithAToken(address token, uint256 amount, uint256 mode, address user);
     /**
      * @notice Constructeur qui configure les paires token/debtToken
      * @param tokens Tableau des adresses des tokens de base
@@ -59,10 +60,17 @@ contract MockRMM is IRMM {
         return amount;
     }
 
+
+    // exemple ici https://gnosisscan.io/tx/0x6b8f220a7e874e043db324ac197a15868ba35ea4e16dbf04d89ec922702fe98d
     function withdraw(address asset, uint256 amount, address onBehalfOf) external override returns (uint256) {
+        require(tokenToSupplyToken[asset] != address(0), "Token not supported");
+        address supplyToken = tokenToDebtToken[asset];
+        require(IERC20(supplyToken).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
+
         require(tokenToDebtToken[asset] != address(0), "Token not supported");
         address debtToken = tokenToDebtToken[asset];
         require(IERC20(debtToken).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
+        emit RepaidWithAToken(asset, amount, interestRateMode, onBehalfOf);
         return amount;
     }
 

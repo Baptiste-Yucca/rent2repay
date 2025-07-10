@@ -17,21 +17,8 @@ const TOKEN_CONFIGS = [
         decimals: 6,
         contractKey: "MockUSDC",
         debtContractKey: "MockDebtUSDC"
-    },
-    {
-        name: "armmUSDC",
-        symbol: "armmUSDC",
-        decimals: 6,
-        contractKey: "armmUSDC",
-        debtContractKey: "armmUSDC"
-    },
-    {
-        name: "armmWXDAI",
-        symbol: "armmWXDAI",
-        decimals: 18,
-        contractKey: "armmWXDAI",
-        debtContractKey: "armmWXDAI"
     }
+    // Note: armmUSDC et armmWXDAI sont des tokens de supply, pas de remboursement de dette
 ];
 
 // Sélectionner le token à tester (0 = WXDAI, 1 = USDC)
