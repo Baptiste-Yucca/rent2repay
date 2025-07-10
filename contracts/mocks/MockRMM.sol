@@ -15,19 +15,20 @@ contract MockRMM is IRMM {
     mapping(address => address) public tokenToSupplyToken;
 
     event Repaid(address token, uint256 amount, uint256 mode, address user);
-    event RepaidWithAToken(address token, uint256 amount, uint256 mode, address user);
+    event Withdrawn(address token, uint256 amount, address to);
     /**
      * @notice Constructeur qui configure les paires token/debtToken
      * @param tokens Tableau des adresses des tokens de base
      * @param debtTokens Tableau des adresses des tokens de dette correspondants
      */
-    constructor(address[] memory tokens, address[] memory debtTokens) {
+    constructor(address[] memory tokens, address[] memory debtTokens, address[] memory supplyTokens) {
         require(tokens.length == debtTokens.length, "Arrays length mismatch");
         
         for (uint256 i = 0; i < tokens.length; i++) {
             require(tokens[i] != address(0), "Token address cannot be zero");
             require(debtTokens[i] != address(0), "Debt token address cannot be zero");
             tokenToDebtToken[tokens[i]] = debtTokens[i];
+            tokenToSupplyToken[tokens[i]] = supplyTokens[i];
         }
     }
 
@@ -60,17 +61,12 @@ contract MockRMM is IRMM {
         return amount;
     }
 
-
-    // exemple ici https://gnosisscan.io/tx/0x6b8f220a7e874e043db324ac197a15868ba35ea4e16dbf04d89ec922702fe98d
-    function withdraw(address asset, uint256 amount, address onBehalfOf) external override returns (uint256) {
+    function withdraw(address asset, uint256 amount, address to) external override returns (uint256) {
         require(tokenToSupplyToken[asset] != address(0), "Token not supported");
-        address supplyToken = tokenToDebtToken[asset];
+        address supplyToken = tokenToSupplyToken[asset];
         require(IERC20(supplyToken).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
-
-        require(tokenToDebtToken[asset] != address(0), "Token not supported");
-        address debtToken = tokenToDebtToken[asset];
-        require(IERC20(debtToken).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
-        emit RepaidWithAToken(asset, amount, interestRateMode, onBehalfOf);
+        require(IERC20(asset).transfer(to, amount), "Transfer from failed");
+        emit Withdrawn(asset, amount, to);
         return amount;
     }
 

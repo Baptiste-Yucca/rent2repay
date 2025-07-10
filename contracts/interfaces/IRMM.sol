@@ -26,7 +26,7 @@ interface IRMM {
      * @notice Withdraws supply tokens on behalf of a user
      * @param asset The address of the asset being withdrawn
      * @param amount The amount to withdraw
-     * @param onBehalfOf The address for whom the withdrawal is performed
+     * @param to The address to send the withdrawn tokens to
      * @return The final amount withdrawn
      */
     function withdraw(
