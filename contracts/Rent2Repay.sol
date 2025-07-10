@@ -18,8 +18,6 @@ import "hardhat/console.sol";
  */
 contract Rent2Repay is AccessControl, Pausable {
     /// @notice Constant for one week in seconds
-    uint256 private constant _DAY_IN_SECONDS = 24 * 60 * 60;
-    /// @notice Constant for one week in seconds
     uint256 private constant _WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
 
     /// @notice Role definitions
@@ -46,7 +44,7 @@ contract Rent2Repay is AccessControl, Pausable {
     mapping(address => uint256) public lastRepayTimestamps;
 
     /// @notice Maps user addresses to token addresses to their periodicity
-    mapping(address => uint256) public periodicity;
+    mapping(address => mapping(address => uint256)) public periodicity;
 
     /// @notice Maps token addresses to their authorization status
     mapping(address => bool) public authorizedTokens;
@@ -280,16 +278,7 @@ contract Rent2Repay is AccessControl, Pausable {
         if (token == address(0)) revert InvalidTokenAddress();
         _;
     }
-
-    /**
-     * @notice Validates that the caller is not trying to repay for themselves
-     * @param user The user address to validate
-     */
-    modifier notSelf(address user) {
-        if (user == msg.sender) revert CannotRepayForSelf();
-        _;
-    }
-
+    
     /**
      * @notice Validates that a token is authorized
      * @param token The token address to validate
@@ -307,41 +296,19 @@ contract Rent2Repay is AccessControl, Pausable {
     function configureRent2Repay(
         address[] calldata tokens,
         uint256[] calldata amounts,
-        uint256  period
+        uint256  period,
+        uint256  _timestamp
     ) external whenNotPaused {
-        require(tokens.length == amounts.length, "Arrays length mismatch");
-        require(tokens.length > 0, "Empty arrays");
-
+        require(tokens.length > 0 && tokens.length == amounts.length, "Invalid array lengths");
             for (uint256 i = 0; i < tokens.length; i++) {
-                if (tokens[i] == address(0)) revert InvalidTokenAddress();
-                if (!authorizedTokens[tokens[i]]) revert TokenNotAuthorized();
-                if (amounts[i] == 0) revert AmountMustBeGreaterThanZero();
-
+                require(tokens[i] != address(0) && authorizedTokens[tokens[i]] && amounts[i] > 0,
+                    "Invalid token or amount");
                 allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
+                periodicity[msg.sender][tokens[i]] = period == 0 ? _WEEK_IN_SECONDS : period;
             }
-
         // Initialize lastRepayTimestamp if it's the first configuration
-        if (lastRepayTimestamps[msg.sender] == 0) {
-            lastRepayTimestamps[msg.sender] = block.timestamp;
-        }
-
-        periodicity[msg.sender] = period == 0 ? _WEEK_IN_SECONDS : period;
-
-        emit Rent2RepayConfigured(msg.sender, tokens, amounts, periodicity[msg.sender]);
-
-    }
-
-    /**
-     * @notice Revokes the Rent2Repay authorization for a specific token
-     * @param token The token address to revoke authorization for
-     */
-    function revokeRent2RepayForToken(address token) 
-        external 
-    {
-        if (allowedMaxAmounts[msg.sender][token] != 0 ){
-            allowedMaxAmounts[msg.sender][token] = 0;
-            emit Rent2RepayRevoked(msg.sender, token);
-        }
+        lastRepayTimestamps[msg.sender] = _timestamp;
+        emit Rent2RepayConfigured(msg.sender, tokens, amounts, period);
     }
 
     /**
@@ -418,36 +385,28 @@ contract Rent2Repay is AccessControl, Pausable {
         validAddress(user)
         validTokenAddress(token)
         onlyAuthorizedToken(token)
-        notSelf(user)
         returns (bool) 
     {
         // security
         if (allowedMaxAmounts[user][token] == 0) revert("User not configured for token");
-        if (periodicity[user] == 0) revert("Periodicity not set");
+        if (periodicity[user][token] == 0) revert("Periodicity not set");
 
-        if(_isNewPeriod(user) == false) revert("wait next period");
+        if(_isNewPeriod(user, token) == false) revert("wait next period");
 
-        // Debug: Affichage du token en cours de traitement
-        console.log("Token:", token);
         uint256 amount = allowedMaxAmounts[user][token];
-        console.log("Amount:", amount);
+        uint256 balance = IERC20(token).balanceOf(user);
+        uint256 toTransfer = balance < amount ? balance : amount;
+        require(IERC20(token).transferFrom(user, address(this), toTransfer), "transferFrom to R2R failed" );
+
+        // TODO: check deblt later
         // Get the debt token for this token
-        address debtToken = tokenToDebtToken[token];
-        if (debtToken == address(0)) revert NoDebtTokenAssociated();
-        // Check 
-        console.log("DebtToken:", debtToken);
+        //address debtToken = tokenToDebtToken[token];
+        //if (debtToken == address(0)) revert NoDebtTokenAssociated();
 
-        //uint256 remainingDebt = IERC20(debtToken).balanceOf(user);
-        //if (remainingDebt == 0) revert("No Debt");
-
-        uint256 toRepay = amount;
-        //if(remainingDebt < amount) toRepay = remainingDebt;
+        uint256 toRepay = toTransfer;   
 
         // Transfer tokens from user to contract first
-        require(
-            IERC20(token).transferFrom(user, address(this), toRepay),
-            "transferFrom to R2R failed"
-        );
+        require(IERC20(token).transferFrom(user, address(this), toRepay), "transferFrom to R2R failed");
 
         // Calculate fees
         uint256 daoFees;
@@ -466,6 +425,10 @@ contract Rent2Repay is AccessControl, Pausable {
             DEFAULT_INTEREST_RATE_MODE,
             user
         );
+        uint256 difference = amountForRepayment - actualAmountRepaid;
+        if(difference > 0) {
+            require(IERC20(token).transfer(user, difference), "transfer to user failed");
+        }
 
         // Update the values only after successful repayment
         lastRepayTimestamps[user] = block.timestamp;
@@ -666,9 +629,9 @@ contract Rent2Repay is AccessControl, Pausable {
         // NOTE Solidity: key removing is impossible
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
             allowedMaxAmounts[user][_authorizedTokensList[i]] = 0;
+            periodicity[user][_authorizedTokensList[i]] = 0;
         }
         lastRepayTimestamps[user] = 0;
-        periodicity[user] = 0;
     }
 
 
@@ -677,8 +640,8 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param lastTimestamp The last recorded timestamp
      * @return true if more than a week has passed since lastTimestamp
      */
-    function _isNewPeriod(address _user) internal view returns (bool) {
-        return block.timestamp >= lastRepayTimestamps[_user] + periodicity[_user];
+    function _isNewPeriod(address _user, address _token) internal view returns (bool) {
+        return block.timestamp >= lastRepayTimestamps[_user] + periodicity[_user][_token];
     }
 
     /**
@@ -695,7 +658,6 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 amountForRepayment
     ) {
         // Calculate base fees
-        console.log("start calculate fees");
         daoFees = (amount * daoFeesBPS) / 10000;
         senderTips = (amount * senderTipsBPS) / 10000;
         
@@ -703,15 +665,12 @@ contract Rent2Repay is AccessControl, Pausable {
         // cas si amount > totalfees divison euclidiennes??
         //
         if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
-            console.log("daoFeeReductionToken", daoFeeReductionToken);
-            console.log("daoFeeReductionMinimumAmount", daoFeeReductionMinimumAmount);
             uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
             if (userBalance >= daoFeeReductionMinimumAmount) {
                 // Reduce DAO fees by the configured percentage (BPS)
                 uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
                 daoFees = daoFees - reductionAmount;
             }
-            console.log("daoFees", daoFees);
         }
         
         uint256 totalFees = daoFees + senderTips;   
@@ -732,9 +691,7 @@ contract Rent2Repay is AccessControl, Pausable {
         address to
     ) 
         external 
-        onlyRole(EMERGENCY_ROLE) 
-        validTokenAddress(token)
-        validAddress(to)
+        onlyRole(ADMIN_ROLE) 
     {
         IERC20(token).transfer(to, amount);
     }

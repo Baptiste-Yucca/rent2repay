@@ -87,13 +87,20 @@ async function main() {
     const periodicity = 1; // 1 seconde pour le test
 
     // Révoquer d'abord au cas où il y aurait une configuration existante
-    await rent2Repay.connect(signers[1]).revokeRent2RepayForToken(await token.getAddress());
+    try {
+        await rent2Repay.connect(signers[1]).revokeRent2RepayAll();
+        console.log("   ⚠️ Configuration existante révoquée");
+    } catch (error) {
+        // Si pas de configuration existante, on continue
+        console.log("   ✅ Aucune configuration existante à révoquer");
+    }
 
     console.log(`   👉 Configuration limite hebdomadaire: ${weeklyLimit} wei...`);
     await rent2Repay.connect(signers[1]).configureRent2Repay(
         [await token.getAddress()],
         [weeklyLimit],
-        periodicity
+        periodicity,
+        Math.floor(Date.now() / 1000) // timestamp actuel
     );
     console.log("   ✅ Configuration Rent2Repay réussie!");
 
