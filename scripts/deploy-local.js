@@ -41,6 +41,23 @@ async function main() {
         deployedAddresses.contracts.MockWXDAI = wxdaiAddress;
         console.log("✅ MockWXDAI déployé à:", wxdaiAddress);
 
+        // ===== NOUVEAUX TOKENS DE SUPPLY LIQUIDITY =====
+        // Déployer armmUSDC (Supply Liquidity Token pour USDC)
+        console.log("🏦 Déploiement de armmUSDC...");
+        const armmUSDC = await MockERC20Factory.deploy("Aave RMM Variable Supply USDC", "armmUSDC");
+        await armmUSDC.waitForDeployment();
+        const armmUSDCAddress = await armmUSDC.getAddress();
+        deployedAddresses.contracts.armmUSDC = armmUSDCAddress;
+        console.log("✅ armmUSDC déployé à:", armmUSDCAddress);
+
+        // Déployer armmWXDAI (Supply Liquidity Token pour WXDAI)
+        console.log("🏦 Déploiement de armmWXDAI...");
+        const armmWXDAI = await MockERC20Factory.deploy("Aave RMM Variable Supply WXDAI", "armmWXDAI");
+        await armmWXDAI.waitForDeployment();
+        const armmWXDAIAddress = await armmWXDAI.getAddress();
+        deployedAddresses.contracts.armmWXDAI = armmWXDAIAddress;
+        console.log("✅ armmWXDAI déployé à:", armmWXDAIAddress);
+
         // Déployer MockDAOToken
         console.log("🪙 Déploiement de MockDAOToken...");
         const mockDAOToken = await MockERC20Factory.deploy("Mock DAO Token", "DAO");
@@ -76,13 +93,15 @@ async function main() {
         const MockRMMFactory = await ethers.getContractFactory("MockRMM");
         console.log("🏗️ Déploiement de MockRMM avec les paires token/debtToken...");
 
-        // Préparer les tableaux pour le constructeur
-        const tokens = [usdcAddress, wxdaiAddress];
-        const debtTokens = [debtUSDCAddress, debtWXDAIAddress];
+        // Préparer les tableaux pour le constructeur (INCLURE LES NOUVEAUX TOKENS)
+        const tokens = [usdcAddress, wxdaiAddress, armmUSDCAddress, armmWXDAIAddress];
+        const debtTokens = [debtUSDCAddress, debtWXDAIAddress, armmUSDCAddress, armmWXDAIAddress]; // Supply tokens servent de leur propre "debt"
 
         console.log("📋 Configuration des paires:");
         console.log("   - USDC:", usdcAddress, "-> DebtUSDC:", debtUSDCAddress);
         console.log("   - WXDAI:", wxdaiAddress, "-> DebtWXDAI:", debtWXDAIAddress);
+        console.log("   - armmUSDC:", armmUSDCAddress, "-> armmUSDC:", armmUSDCAddress, "(self-mapping pour supply)");
+        console.log("   - armmWXDAI:", armmWXDAIAddress, "-> armmWXDAI:", armmWXDAIAddress, "(self-mapping pour supply)");
 
         const mockRMM = await MockRMMFactory.deploy(tokens, debtTokens);
         await mockRMM.waitForDeployment();
@@ -127,11 +146,40 @@ async function main() {
             deployedWXDAIdebtaddr
         );
 
+        // ===== AJOUT DES NOUVEAUX TOKENS DE SUPPLY LIQUIDITY =====
+        console.log("\n🔗 === Ajout des tokens de supply liquidity au Rent2Repay ===");
+
+        console.log("🏦 Ajout de la paire armmUSDC...");
+        await rent2Repay.authorizeTokenPair(armmUSDCAddress, armmUSDCAddress);
+        console.log("✅ Paire armmUSDC ajoutée au Rent2Repay");
+
+        console.log("🏦 Ajout de la paire armmWXDAI...");
+        await rent2Repay.authorizeTokenPair(armmWXDAIAddress, armmWXDAIAddress);
+        console.log("✅ Paire armmWXDAI ajoutée au Rent2Repay");
+
+        // Vérification des nouvelles paires
+        const deployedarmmUSDCaddr = await rent2Repay.getDebtToken(armmUSDCAddress);
+        const deployedarmmWXDAIaddr = await rent2Repay.getDebtToken(armmWXDAIAddress);
+
+        console.log(
+            deployedarmmUSDCaddr.toLowerCase() === armmUSDCAddress.toLowerCase()
+                ? "✅ check armmUSDC address"
+                : "❌ check armmUSDC address",
+            deployedarmmUSDCaddr
+        );
+        console.log(
+            deployedarmmWXDAIaddr.toLowerCase() === armmWXDAIAddress.toLowerCase()
+                ? "✅ check armmWXDAI address"
+                : "❌ check armmWXDAI address",
+            deployedarmmWXDAIaddr
+        );
+
         // ===== ÉTAPE 5: Configuration initiale =====
         console.log("\n📝 === ÉTAPE 5: Configuration initiale ===");
 
         // Les paires de tokens sont déjà autorisées par le constructeur
         console.log("✅ Paires de tokens USDC/DebtUSDC et WXDAI/DebtWXDAI pré-autorisées par le constructeur");
+        console.log("✅ Paires de tokens armmUSDC/armmUSDC et armmWXDAI/armmWXDAI ajoutées dynamiquement");
 
         // Configurer l'adresse de la trésorerie DAO (utilise le déployeur pour les tests)
         await rent2Repay.updateDaoTreasuryAddress(deployer.address);
@@ -195,13 +243,29 @@ async function main() {
                 token: usdcAddress,
                 debtToken: debtUSDCAddress,
                 name: "USDC",
-                symbol: "USDC"
+                symbol: "USDC",
+                type: "stablecoin"
             },
             {
                 token: wxdaiAddress,
                 debtToken: debtWXDAIAddress,
                 name: "WXDAI",
-                symbol: "WXDAI"
+                symbol: "WXDAI",
+                type: "stablecoin"
+            },
+            {
+                token: armmUSDCAddress,
+                debtToken: armmUSDCAddress,
+                name: "armmUSDC",
+                symbol: "armmUSDC",
+                type: "supply_liquidity"
+            },
+            {
+                token: armmWXDAIAddress,
+                debtToken: armmWXDAIAddress,
+                name: "armmWXDAI",
+                symbol: "armmWXDAI",
+                type: "supply_liquidity"
             }
         ];
 
@@ -246,6 +310,8 @@ async function main() {
     console.log("🏗️ MockRMM:", deployedAddresses.contracts.MockRMM);
     console.log("🪙 MockUSDC:", deployedAddresses.contracts.MockUSDC);
     console.log("🪙 MockWXDAI:", deployedAddresses.contracts.MockWXDAI);
+    console.log("🏦 armmUSDC:", deployedAddresses.contracts.armmUSDC);
+    console.log("🏦 armmWXDAI:", deployedAddresses.contracts.armmWXDAI);
     console.log("🪙 MockDAOToken:", deployedAddresses.contracts.MockDAOToken);
     console.log("🏦 MockDebtUSDC:", deployedAddresses.contracts.MockDebtUSDC);
     console.log("🏦 MockDebtWXDAI:", deployedAddresses.contracts.MockDebtWXDAI);

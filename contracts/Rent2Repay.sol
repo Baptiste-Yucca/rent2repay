@@ -50,6 +50,9 @@ contract Rent2Repay is AccessControl, Pausable {
     mapping(address => bool) public authorizedTokens;
     
     /// @notice Maps token addresses to their debt token addresses
+    mapping(address => address) public tokenToArmmToken;
+
+    /// @notice Maps token addresses to their debt token addresses
     mapping(address => address) public tokenToDebtToken;
 
     /// @notice Array to keep track of authorized tokens
@@ -228,8 +231,10 @@ contract Rent2Repay is AccessControl, Pausable {
         address _rmm,
         address wxdaiToken,
         address wxdaiDebtToken,
+        address wxdaiArmmToken,
         address usdcToken,
-        address usdcDebtToken
+        address usdcDebtToken,
+        address usdcArmmToken
     ) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
@@ -239,8 +244,8 @@ contract Rent2Repay is AccessControl, Pausable {
         rmm = IRMM(_rmm);
         
         // Initialize with WXDAI and USDC as authorized token pairs
-        _authorizeTokenPair(wxdaiToken, wxdaiDebtToken);
-        _authorizeTokenPair(usdcToken, usdcDebtToken);
+        _authorizeTokenPair(wxdaiToken, wxdaiDebtToken, wxdaiArmmToken);
+        _authorizeTokenPair(usdcToken, usdcDebtToken, usdcArmmToken);
     }
 
     /**
@@ -588,9 +593,10 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param token The token address to authorize
      * @param debtToken The debt token address associated with the token
      */
-    function _authorizeTokenPair(address token, address debtToken) internal {
+    function _authorizeTokenPair(address token, address debtToken, address armmToken) internal {
         authorizedTokens[token] = true;
         tokenToDebtToken[token] = debtToken;
+        tokenToArmmToken[token] = armmToken;
         _authorizedTokensList.push(token);
         emit TokenPairAuthorized(token, debtToken);
     }

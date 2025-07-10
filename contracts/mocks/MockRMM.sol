@@ -59,6 +59,13 @@ contract MockRMM is IRMM {
         return amount;
     }
 
+    function withdraw(address asset, uint256 amount, address onBehalfOf) external override returns (uint256) {
+        require(tokenToDebtToken[asset] != address(0), "Token not supported");
+        address debtToken = tokenToDebtToken[asset];
+        require(IERC20(debtToken).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
+        return amount;
+    }
+
     /**
      * @notice Récupère l'adresse du token de dette pour un token donné
      * @param token L'adresse du token

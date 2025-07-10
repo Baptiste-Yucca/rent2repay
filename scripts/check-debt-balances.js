@@ -17,6 +17,20 @@ const TOKEN_CONFIGS = [
         decimals: 6,
         contractKey: "MockUSDC",
         debtContractKey: "MockDebtUSDC"
+    },
+    {
+        name: "armmUSDC",
+        symbol: "armmUSDC",
+        decimals: 6,
+        contractKey: "armmUSDC",
+        debtContractKey: "armmUSDC"
+    },
+    {
+        name: "armmWXDAI",
+        symbol: "armmWXDAI",
+        decimals: 18,
+        contractKey: "armmWXDAI",
+        debtContractKey: "armmWXDAI"
     }
 ];
 
@@ -74,10 +88,10 @@ async function main() {
     const tokenAmount = ethers.parseUnits("10000", SELECTED_TOKEN.decimals);
     const debtAmount = ethers.parseUnits("300", SELECTED_TOKEN.decimals);
 
-    console.log(`   👉 Mint de ${tokenAmount} ${SELECTED_TOKEN.name} à l'utilisateur...`);
+    console.log(`   👉 Mint de ${ethers.formatUnits(tokenAmount, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${tokenAmount} Wei) à l'utilisateur...`);
     await token.mint(userAddress, tokenAmount);
 
-    console.log(`   👉 Mint de ${debtAmount} debt ${SELECTED_TOKEN.name} à l'utilisateur...`);
+    console.log(`   👉 Mint de ${ethers.formatUnits(debtAmount, SELECTED_TOKEN.decimals)} debt ${SELECTED_TOKEN.name} (${debtAmount} Wei) à l'utilisateur...`);
     await debtToken.mint(userAddress, debtAmount);
 
     // === ÉTAPE 2: Configuration Rent2Repay ===
@@ -95,7 +109,7 @@ async function main() {
         console.log("   ✅ Aucune configuration existante à révoquer");
     }
 
-    console.log(`   👉 Configuration limite hebdomadaire: ${weeklyLimit} wei...`);
+    console.log(`   👉 Configuration limite hebdomadaire: ${ethers.formatUnits(weeklyLimit, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${weeklyLimit} Wei)...`);
     await rent2Repay.connect(signers[1]).configureRent2Repay(
         [await token.getAddress()],
         [weeklyLimit],
@@ -142,12 +156,12 @@ async function main() {
         userConfiguredAmount: (await rent2Repay.getUserConfigForToken(userAddress, await token.getAddress()))[0]
     };
 
-    console.log("   État initial (en wei):");
-    console.log(`   👤 User ${SELECTED_TOKEN.name} balance: ${beforeState.userTokenBalance}`);
-    console.log(`   👤 User debt ${SELECTED_TOKEN.name} balance: ${beforeState.userDebtBalance}`);
-    console.log(`   🏃 Runner ${SELECTED_TOKEN.name} balance: ${beforeState.runnerTokenBalance}`);
-    console.log(`   🏦 DAO treasury ${SELECTED_TOKEN.name} balance: ${beforeState.daoTreasuryBalance}`);
-    console.log(`   ⚙️ User configured amount: ${beforeState.userConfiguredAmount}`);
+    console.log("   État initial :");
+    console.log(`   👤 User ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(beforeState.userTokenBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.userTokenBalance} Wei)`);
+    console.log(`   👤 User debt ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(beforeState.userDebtBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.userDebtBalance} Wei)`);
+    console.log(`   🏃 Runner ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(beforeState.runnerTokenBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.runnerTokenBalance} Wei)`);
+    console.log(`   🏦 DAO treasury ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(beforeState.daoTreasuryBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.daoTreasuryBalance} Wei)`);
+    console.log(`   ⚙️ User configured amount: ${ethers.formatUnits(beforeState.userConfiguredAmount, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.userConfiguredAmount} Wei)`);
 
     // === ÉTAPE 5: Calcul de l'ATTENDU ===
     console.log("\n🎯 === ÉTAPE 5: Calcul de l'ATTENDU ===");
@@ -170,18 +184,23 @@ async function main() {
     console.log(`   💰 DAO fees BPS: ${daoFeesBPS}`);
     console.log(`   🎁 Sender tips BPS: ${senderTipsBPS}`);
     console.log("");
-    console.log("   🎯 ATTENDU du remboursement (en wei):");
-    console.log(`   💸 Montant à rembourser: ${amountToRepay}`);
-    console.log(`   💰 Fees DAO attendues: ${expectedDaoFees}`);
-    console.log(`   🎁 Tips runner attendues: ${expectedSenderTips}`);
-    console.log(`   💰 Total des fees: ${expectedTotalFees}`);
-    console.log(`   🔄 Montant net pour remboursement: ${expectedAmountForRepayment}`);
+    console.log("   🎯 ATTENDU du remboursement :");
+    console.log(`   💸 Montant à rembourser: ${ethers.formatUnits(amountToRepay, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${amountToRepay} Wei)`);
+    console.log(`   💰 Fees DAO attendues: ${ethers.formatUnits(expectedDaoFees, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${expectedDaoFees} Wei)`);
+    console.log(`   🎁 Tips runner attendues: ${ethers.formatUnits(expectedSenderTips, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${expectedSenderTips} Wei)`);
+    console.log(`   💰 Total des fees: ${ethers.formatUnits(expectedTotalFees, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${expectedTotalFees} Wei)`);
+    console.log(`   🔄 Montant net pour remboursement: ${ethers.formatUnits(expectedAmountForRepayment, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${expectedAmountForRepayment} Wei)`);
     console.log("");
     console.log("   📊 Changements attendus:");
-    console.log(`   👤 User ${SELECTED_TOKEN.name}: ${beforeState.userTokenBalance} → ${beforeState.userTokenBalance - amountToRepay}`);
-    console.log(`   👤 User debt ${SELECTED_TOKEN.name}: ${beforeState.userDebtBalance} → ${expectedAmountForRepayment > 0n ? beforeState.userDebtBalance - expectedAmountForRepayment : beforeState.userDebtBalance}`);
-    console.log(`   🏃 Runner ${SELECTED_TOKEN.name}: ${beforeState.runnerTokenBalance} → ${beforeState.runnerTokenBalance + expectedSenderTips}`);
-    console.log(`   🏦 DAO treasury ${SELECTED_TOKEN.name}: ${beforeState.daoTreasuryBalance} → ${beforeState.daoTreasuryBalance + expectedDaoFees}`);
+    const expectedUserTokenAfter = beforeState.userTokenBalance - amountToRepay;
+    const expectedUserDebtAfter = expectedAmountForRepayment > 0n ? beforeState.userDebtBalance - expectedAmountForRepayment : beforeState.userDebtBalance;
+    const expectedRunnerTokenAfter = beforeState.runnerTokenBalance + expectedSenderTips;
+    const expectedDaoTreasuryAfter = beforeState.daoTreasuryBalance + expectedDaoFees;
+
+    console.log(`   👤 User ${SELECTED_TOKEN.name}: ${ethers.formatUnits(beforeState.userTokenBalance, SELECTED_TOKEN.decimals)} → ${ethers.formatUnits(expectedUserTokenAfter, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.userTokenBalance} → ${expectedUserTokenAfter} Wei)`);
+    console.log(`   👤 User debt ${SELECTED_TOKEN.name}: ${ethers.formatUnits(beforeState.userDebtBalance, SELECTED_TOKEN.decimals)} → ${ethers.formatUnits(expectedUserDebtAfter, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.userDebtBalance} → ${expectedUserDebtAfter} Wei)`);
+    console.log(`   🏃 Runner ${SELECTED_TOKEN.name}: ${ethers.formatUnits(beforeState.runnerTokenBalance, SELECTED_TOKEN.decimals)} → ${ethers.formatUnits(expectedRunnerTokenAfter, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.runnerTokenBalance} → ${expectedRunnerTokenAfter} Wei)`);
+    console.log(`   🏦 DAO treasury ${SELECTED_TOKEN.name}: ${ethers.formatUnits(beforeState.daoTreasuryBalance, SELECTED_TOKEN.decimals)} → ${ethers.formatUnits(expectedDaoTreasuryAfter, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${beforeState.daoTreasuryBalance} → ${expectedDaoTreasuryAfter} Wei)`);
 
     // === ÉTAPE 6: Exécution du remboursement ===
     console.log("\n🚀 === ÉTAPE 6: Exécution du remboursement ===");
@@ -209,11 +228,11 @@ async function main() {
         daoTreasuryBalance: await token.balanceOf(daoConfig.treasuryAddress)
     };
 
-    console.log("   État final (en wei):");
-    console.log(`   👤 User ${SELECTED_TOKEN.name} balance: ${afterState.userTokenBalance}`);
-    console.log(`   👤 User debt ${SELECTED_TOKEN.name} balance: ${afterState.userDebtBalance}`);
-    console.log(`   🏃 Runner ${SELECTED_TOKEN.name} balance: ${afterState.runnerTokenBalance}`);
-    console.log(`   🏦 DAO treasury ${SELECTED_TOKEN.name} balance: ${afterState.daoTreasuryBalance}`);
+    console.log("   État final :");
+    console.log(`   👤 User ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(afterState.userTokenBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${afterState.userTokenBalance} Wei)`);
+    console.log(`   👤 User debt ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(afterState.userDebtBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${afterState.userDebtBalance} Wei)`);
+    console.log(`   🏃 Runner ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(afterState.runnerTokenBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${afterState.runnerTokenBalance} Wei)`);
+    console.log(`   🏦 DAO treasury ${SELECTED_TOKEN.name} balance: ${ethers.formatUnits(afterState.daoTreasuryBalance, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${afterState.daoTreasuryBalance} Wei)`);
 
     // === ÉTAPE 8: Comparaison ATTENDU vs RÉEL ===
     console.log("\n✅ === ÉTAPE 8: Vérification ATTENDU vs RÉEL ===");
@@ -233,10 +252,10 @@ async function main() {
     const runnerTokenOK = actualChanges.runnerTokenChange === expectedSenderTips;
     const daoTreasuryOK = actualChanges.daoTreasuryChange === expectedDaoFees;
 
-    console.log(`   ${userTokenOK ? '✅' : '❌'} User ${SELECTED_TOKEN.name} changement: ${actualChanges.userTokenChange} (attendu: ${amountToRepay})`);
-    console.log(`   ${userDebtOK ? '✅' : '❌'} User debt changement: ${actualChanges.userDebtChange} (attendu: ${expectedAmountForRepayment})`);
-    console.log(`   ${runnerTokenOK ? '✅' : '❌'} Runner ${SELECTED_TOKEN.name} changement: ${actualChanges.runnerTokenChange} (attendu: ${expectedSenderTips})`);
-    console.log(`   ${daoTreasuryOK ? '✅' : '❌'} DAO treasury changement: ${actualChanges.daoTreasuryChange} (attendu: ${expectedDaoFees})`);
+    console.log(`   ${userTokenOK ? '✅' : '❌'} User ${SELECTED_TOKEN.name} changement: ${ethers.formatUnits(actualChanges.userTokenChange, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (attendu: ${ethers.formatUnits(amountToRepay, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name}) [${actualChanges.userTokenChange} Wei vs ${amountToRepay} Wei]`);
+    console.log(`   ${userDebtOK ? '✅' : '❌'} User debt changement: ${ethers.formatUnits(actualChanges.userDebtChange, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (attendu: ${ethers.formatUnits(expectedAmountForRepayment, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name}) [${actualChanges.userDebtChange} Wei vs ${expectedAmountForRepayment} Wei]`);
+    console.log(`   ${runnerTokenOK ? '✅' : '❌'} Runner ${SELECTED_TOKEN.name} changement: ${ethers.formatUnits(actualChanges.runnerTokenChange, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (attendu: ${ethers.formatUnits(expectedSenderTips, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name}) [${actualChanges.runnerTokenChange} Wei vs ${expectedSenderTips} Wei]`);
+    console.log(`   ${daoTreasuryOK ? '✅' : '❌'} DAO treasury changement: ${ethers.formatUnits(actualChanges.daoTreasuryChange, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (attendu: ${ethers.formatUnits(expectedDaoFees, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name}) [${actualChanges.daoTreasuryChange} Wei vs ${expectedDaoFees} Wei]`);
 
     const allOK = userTokenOK && userDebtOK && runnerTokenOK && daoTreasuryOK;
 
@@ -248,8 +267,8 @@ async function main() {
     }
 
     console.log(`📊 Token testé: ${SELECTED_TOKEN.name} (${SELECTED_TOKEN.decimals} decimals)`);
-    console.log(`💰 Montant remboursé: ${amountToRepay} wei`);
-    console.log(`💸 Total des fees: ${expectedTotalFees} wei`);
+    console.log(`💰 Montant remboursé: ${ethers.formatUnits(amountToRepay, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${amountToRepay} Wei)`);
+    console.log(`💸 Total des fees: ${ethers.formatUnits(expectedTotalFees, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${expectedTotalFees} Wei)`);
 }
 
 main()

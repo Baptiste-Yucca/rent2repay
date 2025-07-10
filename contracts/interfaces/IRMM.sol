@@ -21,4 +21,17 @@ interface IRMM {
         uint256 interestRateMode,
         address onBehalfOf
     ) external returns (uint256);
+
+    /**
+     * @notice Withdraws supply tokens on behalf of a user
+     * @param asset The address of the asset being withdrawn
+     * @param amount The amount to withdraw
+     * @param onBehalfOf The address for whom the withdrawal is performed
+     * @return The final amount withdrawn
+     */
+    function withdraw(
+        address asset,
+        uint256 amount,
+        address to
+    ) external returns (uint256);
 } 
