@@ -30,6 +30,13 @@ contract Rent2Repay is AccessControl, Pausable {
         address debtToken;
     }
 
+    struct TokenConfig {
+        address token;
+        address debtToken;
+        address supplyToken;
+        bool active;
+    }
+
     /// @notice RMM contract interface
     IRMM public immutable rmm;
     
@@ -49,11 +56,7 @@ contract Rent2Repay is AccessControl, Pausable {
     mapping(address => bool) public authorizedTokens;
     
     /// @notice Maps token addresses to their debt token addresses
-    mapping(address => address) public tokenToSupplyToken;
-
-    // actually repay with armm ... need calculate index for the user , risky ?
-    /// @notice Maps token addresses to their debt token addresses
-    mapping(address => address) public tokenToDebtToken;
+    mapping(address => TokenConfig) public tokenConfig;
 
     /// @notice Array to keep track of authorized tokens
     address[] private _authorizedTokensList;
@@ -129,7 +132,11 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @notice Emitted when a token pair is authorized
     /// @param token The token address that was authorized
     /// @param debtToken The debt token address associated with the token
-    event TokenPairAuthorized(address indexed token, address indexed debtToken);
+    event TokenTripleAuthorized(
+        address indexed token, 
+        address indexed debtToken, 
+        address indexed supplyToken
+    );
 
     /// @notice Emitted when DAO fees are updated
     /// @param oldFees The previous DAO fees in BPS
@@ -576,77 +583,37 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
-     * @notice Gets the list of all authorized tokens and their debt tokens
-     * @return tokens Array of authorized token addresses
-     * @return debtTokens Array of corresponding debt token addresses
-     */
-    function getAuthorizedTokenPairs() external view returns (
-        address[] memory tokens, 
-        address[] memory debtTokens
-    ) {
-        uint256 count = 0;
-        
-        // Count valid pairs
-        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            address token = _authorizedTokensList[i];
-            if (authorizedTokens[token] && tokenToDebtToken[token] != address(0)) {
-                count++;
-            }
-        }
-        
-        tokens = new address[](count);
-        debtTokens = new address[](count);
-        
-        uint256 index = 0;
-        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            address token = _authorizedTokensList[i];
-            if (authorizedTokens[token] && tokenToDebtToken[token] != address(0)) {
-                tokens[index] = token;
-                debtTokens[index] = tokenToDebtToken[token];
-                index++;
-            }
-        }
-    }
-
-    /**
-     * @notice Gets the debt token address for a given token
-     * @param token The token address
-     * @return The debt token address associated with the token
-     */
-    function getDebtToken(address token) external view returns (address) {
-        return tokenToDebtToken[token];
-    }
-
-    /**
      * @notice Allows admins to authorize a new token pair
      * @param token The token address to authorize
      * @param debtToken The debt token address associated with the token
+     * @param supplyToken The supply token address associated with the token
      */
-    function authorizeTokenPair(address token, address debtToken) 
+    function authorizeTokenTriple(address token, address debtToken, address supplyToken) 
         external 
         onlyRole(ADMIN_ROLE) 
-        validTokenAddress(token)
-        validTokenAddress(debtToken)
     {
-        if (tokenToDebtToken[token] != address(0)) revert TokenAlreadyAuthorized();
-        
-        authorizedTokens[token] = true;
-        tokenToDebtToken[token] = debtToken;
-        _authorizedTokensList.push(token);
-        emit TokenPairAuthorized(token, debtToken);
+        _authorizeTokenPair(token, debtToken, supplyToken);
     }
 
     /**
      * @notice Internal function to authorize a token pair
      * @param token The token address to authorize
      * @param debtToken The debt token address associated with the token
+     * @param supplyToken The supply token address associated with the token
      */
-    function _authorizeTokenPair(address token, address debtToken, address armmToken) internal {
-        authorizedTokens[token] = true;
-        tokenToDebtToken[token] = debtToken;
-        tokenToSupplyToken[token] = armmToken;
+    function _authorizeTokenPair(address token, address debtToken, address supplyToken) internal {
+        TokenConfig memory config = TokenConfig({
+            token: token,
+            debtToken: debtToken,
+            supplyToken: supplyToken,
+            active: true
+        });
+        
+        tokenConfig[token] = config;
+        tokenConfig[supplyToken] = config;
         _authorizedTokensList.push(token);
-        emit TokenPairAuthorized(token, debtToken);
+
+        emit TokenTripleAuthorized(token, debtToken, supplyToken);
     }
 
     /**
@@ -658,10 +625,9 @@ contract Rent2Repay is AccessControl, Pausable {
         onlyRole(ADMIN_ROLE) 
         validTokenAddress(token) 
     {
-        if (!authorizedTokens[token]) revert TokenNotAuthorized();
+        if (!tokenConfig[token].active) revert TokenNotAuthorized();
         
-        authorizedTokens[token] = false;
-        tokenToDebtToken[token] = address(0);
+        tokenConfig[token].active = false;
         
         // Remove from authorizedTokensList
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
