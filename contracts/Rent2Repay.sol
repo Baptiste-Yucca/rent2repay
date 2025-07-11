@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IRMM.sol";
 // Import pour le debugging - à retirer en production
-import "hardhat/console.sol";
 
 /**
  * @title Rent2Repay
@@ -377,13 +376,13 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
 
-    /**
-     * @notice Executes automatic repayment for a user with a specific token
-     * @dev This function can be called by anyone to execute automatic repayments
-     * @param user Address of the user for whom to execute the repayment
-     * @param token Address of the token to use for repayment
-     * @return true if the repayment is authorized and limits updated
-     */
+    // Helper function to perform security checks and configuration validation
+    function _validateUserAndToken(address user, address token) internal view {
+        require(allowedMaxAmounts[user][token] > 0, "User not configured for token");
+        require(periodicity[user][token] > 0, "Periodicity not set");
+        require(_isNewPeriod(user, token), "Wait next period");
+    }
+
     function rent2repay(address user, address token) 
         external 
         whenNotPaused
@@ -392,41 +391,24 @@ contract Rent2Repay is AccessControl, Pausable {
         onlyAuthorizedToken(token)
         returns (bool) 
     {
-        // security
-        if (allowedMaxAmounts[user][token] == 0) revert("User not configured for token");
-        if (periodicity[user][token] == 0) revert("Periodicity not set");
-
-        if(_isNewPeriod(user, token) == false) revert("wait next period");
+        _validateUserAndToken(user, token);
 
         uint256 amount = allowedMaxAmounts[user][token];
         uint256 balance = IERC20(token).balanceOf(user);
         uint256 toTransfer = balance < amount ? balance : amount;
 
-        // TODO: check deblt later
-        // dans le code 
-    //if (params.amount < paybackAmount) {
-     // paybackAmount = params.amount;
-    //}
-        // Get the debt token for this token
-        //address debtToken = tokenToDebtToken[token];
-        //if (debtToken == address(0)) revert NoDebtTokenAssociated();
+        require(
+            IERC20(token).transferFrom(user, address(this), toTransfer),
+            "transferFrom to R2R failed"
+        );
 
-        uint256 toRepay = toTransfer;   
+        (
+            uint256 daoFees,
+            uint256 senderTips,
+            uint256 amountForRepayment
+        ) = _calculateFees(toTransfer, user);
 
-        // Transfer tokens from user to contract first
-        require(IERC20(token).transferFrom(user, address(this), toRepay), "transferFrom to R2R failed");
-
-        // Calculate fees
-        uint256 daoFees;
-        uint256 senderTips;
-        uint256 amountForRepayment;
-        (daoFees, senderTips, amountForRepayment) = _calculateFees(toRepay, user);
-        
-        // Transfer fees to respective addresses
-        _transferFees(token, daoFees, senderTips);
-        
         require(IERC20(token).approve(address(rmm), amountForRepayment), "Approve failed");
-        // Call RMM repay function with the amount minus fees
         uint256 actualAmountRepaid = rmm.repay(
             token,
             amountForRepayment,
@@ -436,120 +418,84 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 difference = amountForRepayment - actualAmountRepaid;
 
         if(difference > 0) {
-            require(IERC20(token).transfer(user, difference), "transfer to user failed");
+            require(
+                IERC20(token).transfer(user, difference),
+                "transfer to user failed"
+            );
         }
 
-        // Update the values only after successful repayment
-        lastRepayTimestamps[user] = block.timestamp;
-        
-        // Emit fees collected event
-        emit FeesCollected(
-            user,
-            token,
-            daoFees,
-            senderTips,
-            msg.sender
-        );
-        
+        // Transfer fees to respective addresses
+        _transferFees(token, daoFees, senderTips);
+
+        // Update timestamp and emit event
+        _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
+
         return true;
     }
 
-    /**
-     * @notice Executes automatic repayment for multiple users with the same token
-     * @dev Processes multiple users for the same token, accumulates fees and transfers them once at the end
-     * @param users Array of user addresses for whom to execute repayments
-     * @param token Token address to use for all repayments
-     */
     function batchRent2Repay(address[] calldata users, address token) 
         external 
         whenNotPaused
         validTokenAddress(token)
         onlyAuthorizedToken(token)
     {
-        // Validate input
         require(users.length > 0, "Empty users array");
         
-        // Accumulate fees for the single token
         uint256 totalDaoFees = 0;
         uint256 totalSenderTips = 0;
         
-        // Process each user
         for (uint256 i = 0; i < users.length; i++) {
-            console.log("iteration", i);
             address user = users[i];
-            
-            // Validate user address
             require(user != address(0), "Invalid user address");
             
-            // Security checks
-            require(allowedMaxAmounts[user][token] > 0, "User not configured for token");
-            require(periodicity[user][token] > 0, "Periodicity not set");
-            require(_isNewPeriod(user, token), "Wait next period");
+            _validateUserAndToken(user, token);
 
             uint256 amount = allowedMaxAmounts[user][token];
-            console.log("amount", amount);
             uint256 balance = IERC20(token).balanceOf(user);
-            console.log("balance", balance);
             uint256 toTransfer = balance < amount ? balance : amount;
-            console.log("toTransfer", toTransfer);
             require(toTransfer > 0, "User has no balance");
-            uint256 debtBalance = IERC20(tokenToDebtToken[token]).balanceOf(user);
-            console.log("debtBalance", debtBalance);
-            
-            // Transfer tokens from user to contract
-            require(IERC20(token).transferFrom(user, address(this), toTransfer), "transferFrom failed");
-            console.log("transferFrom done");
 
-            // Calculate fees for this user
-            uint256 daoFees;
-            uint256 senderTips;
-            uint256 amountForRepayment;
-            (daoFees, senderTips, amountForRepayment) = _calculateFees(toTransfer, user);
-            console.log("daoFees", daoFees);
-            console.log("senderTips", senderTips);
-            console.log("amountForRepayment", amountForRepayment);
-            // Accumulate fees
+            require(
+                IERC20(token).transferFrom(user, address(this), toTransfer),
+                "transferFrom failed"
+            );
+
+            (
+                uint256 daoFees,
+                uint256 senderTips,
+                uint256 amountForRepayment
+            ) = _calculateFees(toTransfer, user);
+
             totalDaoFees += daoFees;
             totalSenderTips += senderTips;
-            console.log("totalDaoFees", totalDaoFees);
-            console.log("totalSenderTips", totalSenderTips);
-            // Approve and repay via RMM
-            require(IERC20(token).approve(address(rmm), amountForRepayment), "Approve failed");
-            console.log("Approve done");
+
+            require(
+                IERC20(token).approve(address(rmm), amountForRepayment),
+                "Approve failed"
+            );
+
             uint256 actualAmountRepaid = rmm.repay(
                 token,
                 amountForRepayment,
                 DEFAULT_INTEREST_RATE_MODE,
                 user
             );
-            console.log("actualAmountRepaid", actualAmountRepaid);
-            // Return excess if any
             uint256 difference = amountForRepayment - actualAmountRepaid;
-            console.log("difference", difference);
             if(difference > 0) {
-                require(IERC20(token).transfer(user, difference), "transfer to user failed");
+                require(
+                    IERC20(token).transfer(user, difference),
+                    "transfer to user failed"
+                );
             }
 
-            // Update timestamp for this user
-            lastRepayTimestamps[user] = block.timestamp;
-            console.log("lastRepayTimestamps", lastRepayTimestamps[user]);
-            // Emit individual repayment event
-            emit RepaymentExecuted(
-                user, 
-                token,
-                actualAmountRepaid, 
-                allowedMaxAmounts[user][token],
-                msg.sender
-            );
+            _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
         }
         
-        // Transfer accumulated fees once at the end (only 2 transfers total)
         if (totalDaoFees > 0 || totalSenderTips > 0) {
             _transferFees(token, totalDaoFees, totalSenderTips);
             
-            // Emit fees collected event for the total
             emit FeesCollected(
-                address(0), // No specific user for batch
+                address(0),
                 token,
                 totalDaoFees,
                 totalSenderTips,
@@ -972,5 +918,21 @@ contract Rent2Repay is AccessControl, Pausable {
         if (senderTips > 0) {
             require(IERC20(token).transfer(msg.sender, senderTips), "Transfer to sender failed");
         }
+    }
+
+    // Helper function to update timestamps and emit events
+    function _updateTimestampAndEmitEvent(
+        address user,
+        address token,
+        uint256 actualAmountRepaid
+    ) internal {
+        lastRepayTimestamps[user] = block.timestamp;
+        emit RepaymentExecuted(
+            user, 
+            token,
+            actualAmountRepaid, 
+            allowedMaxAmounts[user][token],
+            msg.sender
+        );
     }
 } 
