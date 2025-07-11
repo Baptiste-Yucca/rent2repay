@@ -401,9 +401,12 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256 amount = allowedMaxAmounts[user][token];
         uint256 balance = IERC20(token).balanceOf(user);
         uint256 toTransfer = balance < amount ? balance : amount;
-        require(IERC20(token).transferFrom(user, address(this), toTransfer), "transferFrom to R2R failed" );
 
         // TODO: check deblt later
+        // dans le code 
+    //if (params.amount < paybackAmount) {
+     // paybackAmount = params.amount;
+    //}
         // Get the debt token for this token
         //address debtToken = tokenToDebtToken[token];
         //if (debtToken == address(0)) revert NoDebtTokenAssociated();
@@ -431,21 +434,13 @@ contract Rent2Repay is AccessControl, Pausable {
             user
         );
         uint256 difference = amountForRepayment - actualAmountRepaid;
+
         if(difference > 0) {
             require(IERC20(token).transfer(user, difference), "transfer to user failed");
         }
 
         // Update the values only after successful repayment
         lastRepayTimestamps[user] = block.timestamp;
-
-        // Emit event with remaining amount
-        emit RepaymentExecuted(
-            user, 
-            token,
-            actualAmountRepaid, 
-            allowedMaxAmounts[user][token],
-            msg.sender
-        );
         
         // Emit fees collected event
         emit FeesCollected(
@@ -457,6 +452,100 @@ contract Rent2Repay is AccessControl, Pausable {
         );
         
         return true;
+    }
+
+    /**
+     * @notice Executes automatic repayment for multiple users with the same token
+     * @dev Processes multiple users for the same token, accumulates fees and transfers them once at the end
+     * @param users Array of user addresses for whom to execute repayments
+     * @param token Token address to use for all repayments
+     */
+    function batchRent2Repay(address[] calldata users, address token) 
+        external 
+        whenNotPaused
+        validTokenAddress(token)
+        onlyAuthorizedToken(token)
+    {
+        // Validate input
+        require(users.length > 0, "Empty users array");
+        
+        // Accumulate fees for the single token
+        uint256 totalDaoFees = 0;
+        uint256 totalSenderTips = 0;
+        
+        // Process each user
+        for (uint256 i = 0; i < users.length; i++) {
+            address user = users[i];
+            
+            // Validate user address
+            require(user != address(0), "Invalid user address");
+            
+            // Security checks
+            require(allowedMaxAmounts[user][token] > 0, "User not configured for token");
+            require(periodicity[user][token] > 0, "Periodicity not set");
+            require(_isNewPeriod(user, token), "Wait next period");
+
+            uint256 amount = allowedMaxAmounts[user][token];
+            uint256 balance = IERC20(token).balanceOf(user);
+            uint256 toTransfer = balance < amount ? balance : amount;
+            
+            require(toTransfer > 0, "User has no balance");
+            
+            // Transfer tokens from user to contract
+            require(IERC20(token).transferFrom(user, address(this), toTransfer), "transferFrom failed");
+
+            // Calculate fees for this user
+            uint256 daoFees;
+            uint256 senderTips;
+            uint256 amountForRepayment;
+            (daoFees, senderTips, amountForRepayment) = _calculateFees(toTransfer, user);
+            
+            // Accumulate fees
+            totalDaoFees += daoFees;
+            totalSenderTips += senderTips;
+            
+            // Approve and repay via RMM
+            require(IERC20(token).approve(address(rmm), amountForRepayment), "Approve failed");
+            
+            uint256 actualAmountRepaid = rmm.repay(
+                token,
+                amountForRepayment,
+                DEFAULT_INTEREST_RATE_MODE,
+                user
+            );
+            
+            // Return excess if any
+            uint256 difference = amountForRepayment - actualAmountRepaid;
+            if(difference > 0) {
+                require(IERC20(token).transfer(user, difference), "transfer to user failed");
+            }
+
+            // Update timestamp for this user
+            lastRepayTimestamps[user] = block.timestamp;
+            
+            // Emit individual repayment event
+            emit RepaymentExecuted(
+                user, 
+                token,
+                actualAmountRepaid, 
+                allowedMaxAmounts[user][token],
+                msg.sender
+            );
+        }
+        
+        // Transfer accumulated fees once at the end (only 2 transfers total)
+        if (totalDaoFees > 0 || totalSenderTips > 0) {
+            _transferFees(token, totalDaoFees, totalSenderTips);
+            
+            // Emit fees collected event for the total
+            emit FeesCollected(
+                address(0), // No specific user for batch
+                token,
+                totalDaoFees,
+                totalSenderTips,
+                msg.sender
+            );
+        }
     }
 
     function whoami() external view returns (bool isAdmin, bool isOperator, bool isEmergency) {
