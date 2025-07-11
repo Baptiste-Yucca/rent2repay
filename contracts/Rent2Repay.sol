@@ -569,11 +569,13 @@ contract Rent2Repay is AccessControl, Pausable {
         view 
         returns (
             uint256,
+            uint256,
             uint256
         ) 
     {
         return (
             allowedMaxAmounts[user][token],
+            periodicity[user][token],
             lastRepayTimestamps[user]
         );
     }
