@@ -30,19 +30,19 @@ const USER_CONFIGS = [
         index: 1, // signer index
         name: "User1",
         configuredAmount: "50",
-        debtAmount: "40" // moins que configuré
+        debtAmount: "1000" // moins que configuré
     },
     {
         index: 2, // signer index
         name: "User2",
         configuredAmount: "100",
-        debtAmount: "120" // plus que configuré
+        debtAmount: "1000" // plus que configuré
     },
     {
         index: 3, // signer index
         name: "User3",
         configuredAmount: "500",
-        debtAmount: "300" // moins que configuré
+        debtAmount: "1000" // moins que configuré
     }
 ];
 

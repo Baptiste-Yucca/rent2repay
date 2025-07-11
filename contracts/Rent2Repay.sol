@@ -475,6 +475,7 @@ contract Rent2Repay is AccessControl, Pausable {
         
         // Process each user
         for (uint256 i = 0; i < users.length; i++) {
+            console.log("iteration", i);
             address user = users[i];
             
             // Validate user address
@@ -486,43 +487,52 @@ contract Rent2Repay is AccessControl, Pausable {
             require(_isNewPeriod(user, token), "Wait next period");
 
             uint256 amount = allowedMaxAmounts[user][token];
+            console.log("amount", amount);
             uint256 balance = IERC20(token).balanceOf(user);
+            console.log("balance", balance);
             uint256 toTransfer = balance < amount ? balance : amount;
-            
+            console.log("toTransfer", toTransfer);
             require(toTransfer > 0, "User has no balance");
+            uint256 debtBalance = IERC20(tokenToDebtToken[token]).balanceOf(user);
+            console.log("debtBalance", debtBalance);
             
             // Transfer tokens from user to contract
             require(IERC20(token).transferFrom(user, address(this), toTransfer), "transferFrom failed");
+            console.log("transferFrom done");
 
             // Calculate fees for this user
             uint256 daoFees;
             uint256 senderTips;
             uint256 amountForRepayment;
             (daoFees, senderTips, amountForRepayment) = _calculateFees(toTransfer, user);
-            
+            console.log("daoFees", daoFees);
+            console.log("senderTips", senderTips);
+            console.log("amountForRepayment", amountForRepayment);
             // Accumulate fees
             totalDaoFees += daoFees;
             totalSenderTips += senderTips;
-            
+            console.log("totalDaoFees", totalDaoFees);
+            console.log("totalSenderTips", totalSenderTips);
             // Approve and repay via RMM
             require(IERC20(token).approve(address(rmm), amountForRepayment), "Approve failed");
-            
+            console.log("Approve done");
             uint256 actualAmountRepaid = rmm.repay(
                 token,
                 amountForRepayment,
                 DEFAULT_INTEREST_RATE_MODE,
                 user
             );
-            
+            console.log("actualAmountRepaid", actualAmountRepaid);
             // Return excess if any
             uint256 difference = amountForRepayment - actualAmountRepaid;
+            console.log("difference", difference);
             if(difference > 0) {
                 require(IERC20(token).transfer(user, difference), "transfer to user failed");
             }
 
             // Update timestamp for this user
             lastRepayTimestamps[user] = block.timestamp;
-            
+            console.log("lastRepayTimestamps", lastRepayTimestamps[user]);
             // Emit individual repayment event
             emit RepaymentExecuted(
                 user, 
