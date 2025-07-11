@@ -49,8 +49,9 @@ contract Rent2Repay is AccessControl, Pausable {
     mapping(address => bool) public authorizedTokens;
     
     /// @notice Maps token addresses to their debt token addresses
-    mapping(address => address) public tokenToArmmToken;
+    mapping(address => address) public tokenToSupplyToken;
 
+    // actually repay with armm ... need calculate index for the user , risky ?
     /// @notice Maps token addresses to their debt token addresses
     mapping(address => address) public tokenToDebtToken;
 
@@ -81,7 +82,7 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @param user The user address that configured the system
     /// @param token The token address configured
     /// @param weeklyMaxAmount The weekly maximum amount set by the user for this token
-    /// @param periodicity todo
+    /// @param periodicity The periodicity of the repayment
     event Rent2RepayConfigured(
         address indexed user, 
         address[] token, 
@@ -643,7 +644,7 @@ contract Rent2Repay is AccessControl, Pausable {
     function _authorizeTokenPair(address token, address debtToken, address armmToken) internal {
         authorizedTokens[token] = true;
         tokenToDebtToken[token] = debtToken;
-        tokenToArmmToken[token] = armmToken;
+        tokenToSupplyToken[token] = armmToken;
         _authorizedTokensList.push(token);
         emit TokenPairAuthorized(token, debtToken);
     }
