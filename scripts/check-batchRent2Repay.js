@@ -68,13 +68,33 @@ async function main() {
 
     // Charger les contrats
     const token = await ethers.getContractAt("MockERC20", config.contracts[SELECTED_TOKEN.contractKey]);
-    const debtToken = await ethers.getContractAt("MockDebtToken", config.contracts[SELECTED_TOKEN.debtContractKey]);
     const rent2Repay = await ethers.getContractAt("Rent2Repay", config.contracts.Rent2Repay);
     const mockRMM = await ethers.getContractAt("MockRMM", config.contracts.MockRMM);
 
+    // Récupérer la configuration du token depuis Rent2Repay
+    let tokenConfig;
+    let debtToken;
+    try {
+        tokenConfig = await rent2Repay.getTokenConfig(await token.getAddress());
+        if (tokenConfig.debtToken === ethers.ZeroAddress) {
+            throw new Error("Token not configured in new system");
+        }
+        debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
+    } catch (error) {
+        console.log("   ⚠️ Token non configuré dans le nouveau système, utilisation de l'ancien système...");
+        debtToken = await ethers.getContractAt("MockDebtToken", config.contracts[SELECTED_TOKEN.debtContractKey]);
+        tokenConfig = {
+            debtToken: config.contracts[SELECTED_TOKEN.debtContractKey],
+            supplyToken: "Non configuré",
+            active: "Non configuré"
+        };
+    }
+
     console.log("📋 Adresses des contrats:");
     console.log(`   ${SELECTED_TOKEN.name}: ${await token.getAddress()}`);
-    console.log(`   Debt${SELECTED_TOKEN.name}: ${await debtToken.getAddress()}`);
+    console.log(`   Debt${SELECTED_TOKEN.name}: ${tokenConfig.debtToken}`);
+    console.log(`   Supply${SELECTED_TOKEN.name}: ${tokenConfig.supplyToken}`);
+    console.log(`   Token Active: ${tokenConfig.active}`);
     console.log(`   Rent2Repay: ${await rent2Repay.getAddress()}`);
     console.log(`   MockRMM: ${await mockRMM.getAddress()}\n`);
 

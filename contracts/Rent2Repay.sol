@@ -52,8 +52,7 @@ contract Rent2Repay is AccessControl, Pausable {
     /// @notice Maps user addresses to token addresses to their periodicity
     mapping(address => mapping(address => uint256)) public periodicity;
 
-    /// @notice Maps token addresses to their authorization status
-    mapping(address => bool) public authorizedTokens;
+    // Note: authorizedTokens mapping removed - now using tokenConfig[token].active
     
     /// @notice Maps token addresses to their debt token addresses
     mapping(address => TokenConfig) public tokenConfig;
@@ -296,7 +295,7 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param token The token address to validate
      */
     modifier onlyAuthorizedToken(address token) {
-        if (!authorizedTokens[token]) revert TokenNotAuthorized();
+        if (!tokenConfig[token].active) revert TokenNotAuthorized();
         _;
     }
 
@@ -313,7 +312,7 @@ contract Rent2Repay is AccessControl, Pausable {
     ) external whenNotPaused {
         require(tokens.length > 0 && tokens.length == amounts.length, "Invalid array lengths");
             for (uint256 i = 0; i < tokens.length; i++) {
-                require(tokens[i] != address(0) && authorizedTokens[tokens[i]] && amounts[i] > 0,
+                require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
                     "Invalid token or amount");
                 allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
                 periodicity[msg.sender][tokens[i]] = period == 0 ? _WEEK_IN_SECONDS : period;
@@ -328,7 +327,6 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function revokeRent2RepayAll() external userIsAuthorized(msg.sender) {
         _removeUserAllTokens(msg.sender);
-        emit Rent2RepayRevokedAll(msg.sender);
     }
 
     /**
@@ -342,7 +340,6 @@ contract Rent2Repay is AccessControl, Pausable {
         userIsAuthorized(user) 
     {
         _removeUserAllTokens(user);
-        emit UserRemovedByOperator(msg.sender, user);
     }
 
     /**
@@ -366,23 +363,14 @@ contract Rent2Repay is AccessControl, Pausable {
      */
     function isAuthorized(address user) public view returns (bool) {
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            if (allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
+            if (tokenConfig[_authorizedTokensList[i]].active && 
+                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
                 return true;
             }
         }
         return false;
     }
-
-    /**
-     * @notice Checks if a user has authorized the Rent2Repay mechanism for a specific token
-     * @param user Address of the user to check
-     * @param token Address of the token to check
-     * @return true if authorized for this token, false otherwise
-     */
-    function isAuthorizedForToken(address user, address token) public view returns (bool) {
-        return allowedMaxAmounts[user][token] > 0;
-    }
-
+    
 
     // Helper function to perform security checks and configuration validation
     function _validateUserAndToken(address user, address token) internal view {
@@ -562,7 +550,8 @@ contract Rent2Repay is AccessControl, Pausable {
         
         // Count authorized tokens for this user
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            if (allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
+            if (tokenConfig[_authorizedTokensList[i]].active && 
+                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
                 authorizedCount++;
             }
         }
@@ -574,7 +563,8 @@ contract Rent2Repay is AccessControl, Pausable {
         // Fill arrays
         uint256 index = 0;
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            if (allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
+            if (tokenConfig[_authorizedTokensList[i]].active && 
+                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
                 tokens[index] = _authorizedTokensList[i];
                 maxAmounts[index] = allowedMaxAmounts[user][_authorizedTokensList[i]];
                 index++;
@@ -612,7 +602,6 @@ contract Rent2Repay is AccessControl, Pausable {
         tokenConfig[token] = config;
         tokenConfig[supplyToken] = config;
         _authorizedTokensList.push(token);
-
         emit TokenTripleAuthorized(token, debtToken, supplyToken);
     }
 
@@ -623,21 +612,17 @@ contract Rent2Repay is AccessControl, Pausable {
     function unauthorizeToken(address token) 
         external 
         onlyRole(ADMIN_ROLE) 
-        validTokenAddress(token) 
     {
-        if (!tokenConfig[token].active) revert TokenNotAuthorized();
-        
         tokenConfig[token].active = false;
-        
+        tokenConfig[tokenConfig[token].supplyToken].active = false;
+
         // Remove from authorizedTokensList
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
             if (_authorizedTokensList[i] == token) {
-                _authorizedTokensList[i] = _authorizedTokensList[_authorizedTokensList.length - 1];
                 _authorizedTokensList.pop();
                 break;
             }
         }
-        
         emit TokenUnauthorized(token);
     }
 
@@ -648,10 +633,13 @@ contract Rent2Repay is AccessControl, Pausable {
     function _removeUserAllTokens(address user) internal {
         // NOTE Solidity: key removing is impossible
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+            allowedMaxAmounts[user][tokenConfig[_authorizedTokensList[i]].supplyToken] = 0;
             allowedMaxAmounts[user][_authorizedTokensList[i]] = 0;
+            periodicity[user][tokenConfig[_authorizedTokensList[i]].supplyToken] = 0;
             periodicity[user][_authorizedTokensList[i]] = 0;
         }
         lastRepayTimestamps[user] = 0;
+        emit Rent2RepayRevokedAll(msg.sender);
     }
 
 
@@ -714,32 +702,6 @@ contract Rent2Repay is AccessControl, Pausable {
         onlyRole(ADMIN_ROLE) 
     {
         IERC20(token).transfer(to, amount);
-    }
-
-    /**
-     * @notice Allows admins to clean up user configurations for an unauthorized token
-     * @dev Only works on tokens that are no longer authorized. 
-     * Useful for cleanup after token removal.
-     * @param token The unauthorized token address to clean up
-     * @param users Array of user addresses to clean up
-     */
-    function cleanupUnauthorizedTokenConfigs(
-        address token,
-        address[] calldata users
-    ) 
-        external 
-        onlyRole(ADMIN_ROLE) 
-        validTokenAddress(token)
-    {
-        // Only allow cleanup of unauthorized tokens
-        if (authorizedTokens[token]) revert TokenStillAuthorized();
-
-        for (uint256 i = 0; i < users.length; i++) {
-            if (users[i] != address(0) && allowedMaxAmounts[users[i]][token] > 0) {
-                allowedMaxAmounts[users[i]][token] = 0;
-                emit Rent2RepayRevoked(users[i], token);
-            }
-        }
     }
 
     /**
@@ -901,5 +863,23 @@ contract Rent2Repay is AccessControl, Pausable {
             allowedMaxAmounts[user][token],
             msg.sender
         );
+    }
+
+    /**
+     * @notice Gets the debt token address for a given token
+     * @param token The token address
+     * @return The debt token address associated with the token
+     */
+    function getDebtToken(address token) external view returns (address) {
+        return tokenConfig[token].debtToken;
+    }
+
+    /**
+     * @notice Gets the token configuration for a given token
+     * @param token The token address
+     * @return The TokenConfig structure containing token, debtToken, supplyToken and active status
+     */
+    function getTokenConfig(address token) external view returns (TokenConfig memory) {
+        return tokenConfig[token];
     }
 } 
