@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IRMM.sol";
+import "hardhat/console.sol";
 
 /**
  * @title MockRMM
@@ -62,20 +63,30 @@ contract MockRMM is IRMM {
     }
 
     function withdraw(address asset, uint256 amount, address to) external override returns (uint256) {
+        console.log("rmm.asset addr", asset);
         require(tokenToSupplyToken[asset] != address(0), "Token not supported");
         address supplyToken = tokenToSupplyToken[asset];
+        console.log("rmm.supplyToken addr", supplyToken);
+   
         require(IERC20(supplyToken).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
+
+        uint256 tmpbalance2 = IERC20(asset).balanceOf(address(this));
+        console.log("rmm.tmpbalance stable", tmpbalance2);
+
         require(IERC20(asset).transfer(to, amount), "Transfer from failed");
+        tmpbalance2 = IERC20(asset).balanceOf(address(this));
+        console.log("rmm.tmpbalance stable after", tmpbalance2);
         emit Withdrawn(asset, amount, to);
         return amount;
     }
 
-    /**
-     * @notice Récupère l'adresse du token de dette pour un token donné
+   /**
+     *  @notice Récupère l'adresse du token de dette pour un token donné
      * @param token L'adresse du token
      * @return L'adresse du token de dette correspondant
      */
     function getDebtToken(address token) external view returns (address) {
         return tokenToDebtToken[token];
     }
+
 }

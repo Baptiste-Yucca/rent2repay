@@ -53,10 +53,16 @@ async function main() {
     let tokenConfig;
     let debtToken;
     try {
-        tokenConfig = await rent2Repay.getTokenConfig(await token.getAddress());
-        if (tokenConfig.debtToken === ethers.ZeroAddress) {
+        const [tokenAddress, debtTokenAddress, supplyTokenAddress, active] = await rent2Repay.getTokenConfig(await token.getAddress());
+        if (debtTokenAddress === ethers.ZeroAddress) {
             throw new Error("Token not configured in new system");
         }
+        tokenConfig = {
+            token: tokenAddress,
+            debtToken: debtTokenAddress,
+            supplyToken: supplyTokenAddress,
+            active: active
+        };
         debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
     } catch (error) {
         console.log("   ⚠️ Token non configuré dans le nouveau système, utilisation de l'ancien système...");
