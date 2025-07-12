@@ -401,47 +401,24 @@ contract Rent2Repay is AccessControl, Pausable {
             uint256 senderTips,
             uint256 amountForRepayment
         ) = _calculateFees(toTransfer, user);
-        console.log("daofees", daoFees);
-        console.log("senderTips", senderTips);
-        console.log("amountForRepayment", amountForRepayment);
+    
 
         require(
             IERC20(token).transferFrom(user, address(this), toTransfer),
             "transferFrom to R2R failed"
         );
 
-        uint256 tmpbalance = IERC20(token).balanceOf(address(this));
-        console.log("balance apres raparttriement (toTransfer)", tmpbalance);
-
         if(isSupplyToken) {
-            
-
-            console.log("toWithdraw", toTransfer);
             require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
-            uint256 withdrawnAmount =rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
-
+            uint256 withdrawnAmount = rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
             console.log("withdrawnAmount", withdrawnAmount);
-            tmpbalance = IERC20(tokenConfig[token].token).balanceOf(address(this));
-            console.log("balanceToken", tmpbalance);
-            tmpbalance = IERC20(tokenConfig[token].supplyToken).balanceOf(address(this));
-            console.log("balanceSupply after", tmpbalance);
-
             //require(withdrawnAmount == toTransfer, "Withdrawn amount mismatch");
             // comment securiser ? 
             // withdrawnAmunt < ampour for repay
         }
 
         // force repayement with stablecoin
-        tmpbalance = IERC20(tokenConfig[token].token).balanceOf(address(this));
-        console.log("before repay stable balance:", tmpbalance);
-        console.log("addr token to approve", tokenConfig[token].token);
         require(IERC20(tokenConfig[token].token).approve(address(rmm), amountForRepayment), "Approve failed");
-        tmpbalance = IERC20(tokenConfig[token].token).balanceOf(address(user));
-        console.log("user stable token balance:", tmpbalance);
-        tmpbalance = IERC20(tokenConfig[token].debtToken).balanceOf(address(user));
-        console.log("User debt token balance:", tmpbalance);
-        tmpbalance = IERC20(tokenConfig[token].token).balanceOf(address(this));
-        console.log("R2R stable token balance:", tmpbalance);
         
         uint256 actualAmountRepaid = rmm.repay(
             tokenConfig[token].token,
@@ -449,19 +426,11 @@ contract Rent2Repay is AccessControl, Pausable {
             DEFAULT_INTEREST_RATE_MODE,
             user
         );
-        tmpbalance = IERC20(tokenConfig[token].token).balanceOf(address(this));
-        console.log("R2R stable token balance:", tmpbalance);
-        tmpbalance = IERC20(tokenConfig[token].debtToken).balanceOf(address(user));
-        console.log("user debt token balance:", tmpbalance);
+
 
         uint256 difference = amountForRepayment - actualAmountRepaid;
         if(difference > 0) {
-            console.log("difference", difference);
-            console.log("amountForRepayment", amountForRepayment);
-            console.log("actualAmountRepaid", actualAmountRepaid);
-
             require(
-                // quid du transfer initial en armm ?
                 IERC20(tokenConfig[token].token).transfer(user, difference),
                 "transfer to user failed"
             );
@@ -492,16 +461,11 @@ contract Rent2Repay is AccessControl, Pausable {
             require(user != address(0), "Invalid user address");
             
             _validateUserAndToken(user, token);
+            bool isSupplyToken = tokenConfig[token].supplyToken == token;
 
             uint256 amount = allowedMaxAmounts[user][token];
             uint256 balance = IERC20(token).balanceOf(user);
             uint256 toTransfer = balance < amount ? balance : amount;
-            require(toTransfer > 0, "User has no balance");
-
-            require(
-                IERC20(token).transferFrom(user, address(this), toTransfer),
-                "transferFrom failed"
-            );
 
             (
                 uint256 daoFees,
@@ -509,24 +473,37 @@ contract Rent2Repay is AccessControl, Pausable {
                 uint256 amountForRepayment
             ) = _calculateFees(toTransfer, user);
 
+            require(
+                IERC20(token).transferFrom(user, address(this), toTransfer),
+                "transferFrom failed"
+            );     
+
             totalDaoFees += daoFees;
             totalSenderTips += senderTips;
 
+            if(isSupplyToken) {
+                require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
+                uint256 withdrawnAmount = rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
+                console.log("withdrawnAmount", withdrawnAmount);
+            }
+
+            // force repayement with stablecoin
             require(
-                IERC20(token).approve(address(rmm), amountForRepayment),
+                IERC20(tokenConfig[token].token).approve(address(rmm), amountForRepayment),
                 "Approve failed"
             );
 
             uint256 actualAmountRepaid = rmm.repay(
-                token,
+                tokenConfig[token].token,
                 amountForRepayment,
                 DEFAULT_INTEREST_RATE_MODE,
                 user
             );
+
             uint256 difference = amountForRepayment - actualAmountRepaid;
             if(difference > 0) {
                 require(
-                    IERC20(token).transfer(user, difference),
+                    IERC20(tokenConfig[token].token).transfer(user, difference),
                     "transfer to user failed"
                 );
             }
