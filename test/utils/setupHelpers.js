@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 async function setupRent2Repay() {
     const [owner, addr1, addr2, addr3, runner, daoTreasury, admin, emergency, operator] = await ethers.getSigners();
@@ -38,9 +38,9 @@ async function setupRent2Repay() {
     await wxdaiToken.mint(await mockRMM.getAddress(), ethers.parseUnits("1000000", 18));
     await usdcToken.mint(await mockRMM.getAddress(), ethers.parseUnits("1000000", 6));
 
-    // Déployer le contrat Rent2Repay avec des rôles séparés
+    // Déployer le contrat Rent2Repay upgradable avec des rôles séparés
     const Rent2Repay = await ethers.getContractFactory("Rent2Repay");
-    const rent2Repay = await Rent2Repay.deploy(
+    const rent2Repay = await upgrades.deployProxy(Rent2Repay, [
         admin.address,    // admin - peut unpause, gérer les fees, etc.
         emergency.address,    // emergency - peut pause
         operator.address,    // operator - peut supprimer des utilisateurs
@@ -51,7 +51,9 @@ async function setupRent2Repay() {
         await usdcToken.getAddress(),      // usdcToken
         await usdcDebtToken.getAddress(),  // usdcDebtToken
         await armmUSDC.getAddress()        // usdcArmmToken
-    );
+    ], {
+        initializer: 'initialize'
+    });
 
     // Configurer l'adresse DAO treasury
     await rent2Repay.connect(admin).updateDaoTreasuryAddress(daoTreasury.address);

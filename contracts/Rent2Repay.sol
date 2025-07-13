@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IRMM.sol";
 // Import pour le debugging - à retirer en production
@@ -16,7 +18,7 @@ import "hardhat/console.sol";
  * for automated repayments. Users can set a maximum amount per token that can be
  * spent per week and tracks usage separately
  */
-contract Rent2Repay is AccessControl, Pausable {
+contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
     /// @notice Constant for one week in seconds
     uint256 private constant _WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
 
@@ -39,7 +41,7 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /// @notice RMM contract interface
-    IRMM public immutable rmm;
+    IRMM public rmm;
     
     /// @notice Default interest rate mode (2 = Variable rate)
     uint256 public constant DEFAULT_INTEREST_RATE_MODE = 2;
@@ -62,10 +64,10 @@ contract Rent2Repay is AccessControl, Pausable {
     address[] private _authorizedTokensList;
 
     /// @notice DAO fees in basis points (BPS) - 10000 = 100%
-    uint256 public daoFeesBPS = 50; // 0.5% default
+    uint256 public daoFeesBPS;
     
     /// @notice Sender tips in basis points (BPS) - 10000 = 100%
-    uint256 public senderTipsBPS = 25; // 0.25% default
+    uint256 public senderTipsBPS;
 
     /// @notice Token address for DAO fee reduction - if user holds this token above minimum 
     /// amount, DAO fees are reduced
@@ -76,7 +78,7 @@ contract Rent2Repay is AccessControl, Pausable {
 
     /// @notice DAO fee reduction percentage in basis points (BPS) - 10000 = 100% 
     /// (exonération totale)
-    uint256 public daoFeeReductionBPS = 5000; // 50% default
+    uint256 public daoFeeReductionBPS;
 
     /// @notice DAO treasury address that receives DAO fees
     address public daoTreasuryAddress;
@@ -220,8 +222,13 @@ contract Rent2Repay is AccessControl, Pausable {
     error InvalidDaoFeeReductionToken();
     error InvalidDaoFeeReductionAmount();
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
-     * @notice Constructor that sets up roles, RMM integration and initial authorized tokens
+     * @notice Initializes the contract with roles, RMM integration and initial authorized tokens
      * @param admin Address that will have admin privileges
      * @param emergency Address that will have emergency privileges
      * @param operator Address that will have operator privileges
@@ -231,7 +238,7 @@ contract Rent2Repay is AccessControl, Pausable {
      * @param usdcToken Address of the USDC token
      * @param usdcDebtToken Address of the USDC debt token
      */
-    constructor(
+    function initialize(
         address admin, 
         address emergency, 
         address operator,
@@ -242,13 +249,22 @@ contract Rent2Repay is AccessControl, Pausable {
         address usdcToken,
         address usdcDebtToken,
         address usdcArmmToken
-    ) {
+    ) external initializer {
+        __AccessControl_init();
+        __Pausable_init();
+        __ReentrancyGuard_init();
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
         _grantRole(EMERGENCY_ROLE, emergency);
         _grantRole(OPERATOR_ROLE, operator);
         
         rmm = IRMM(_rmm);
+        
+        // Initialize default fee values
+        daoFeesBPS = 50; // 0.5% default
+        senderTipsBPS = 25; // 0.25% default
+        daoFeeReductionBPS = 5000; // 50% default
         
         // Initialize with WXDAI and USDC as authorized token pairs
         _authorizeTokenPair(wxdaiToken, wxdaiDebtToken, wxdaiArmmToken);
@@ -301,7 +317,7 @@ contract Rent2Repay is AccessControl, Pausable {
         uint256[] calldata amounts,
         uint256  period,
         uint256  _timestamp
-    ) external whenNotPaused {
+    ) external whenNotPaused nonReentrant {
         require(tokens.length > 0 && tokens.length == amounts.length, "Invalid array lengths");
             for (uint256 i = 0; i < tokens.length; i++) {
                 require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
@@ -377,6 +393,7 @@ contract Rent2Repay is AccessControl, Pausable {
         validAddress(user)
         validTokenAddress(token)
         onlyAuthorizedToken(token)
+        nonReentrant
         returns (bool) 
     {
         _validateUserAndToken(user, token);
@@ -402,8 +419,7 @@ contract Rent2Repay is AccessControl, Pausable {
         if(isSupplyToken) {
             require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
             uint256 withdrawnAmount = rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
-            console.log("withdrawnAmount", withdrawnAmount);
-            //require(withdrawnAmount == toTransfer, "Withdrawn amount mismatch");
+            require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
             // comment securiser ? 
             // withdrawnAmunt < ampour for repay
         }
@@ -458,8 +474,8 @@ contract Rent2Repay is AccessControl, Pausable {
         whenNotPaused
         validTokenAddress(token)
         onlyAuthorizedToken(token)
+        nonReentrant
     {
-        require(users.length > 0, "Empty users array");
         
         uint256 totalDaoFees = 0;
         uint256 totalSenderTips = 0;
@@ -492,7 +508,8 @@ contract Rent2Repay is AccessControl, Pausable {
             if(isSupplyToken) {
                 require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
                 uint256 withdrawnAmount = rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
-                console.log("withdrawnAmount", withdrawnAmount);
+                // see what happens on Gnossi chain
+                require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
             }
 
             // force repayement with stablecoin
@@ -595,7 +612,7 @@ contract Rent2Repay is AccessControl, Pausable {
         )
     {
         uint256 authorizedCount = 0;
-        
+    
         // Count authorized tokens for this user
         for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
             if (tokenConfig[_authorizedTokensList[i]].active && 
@@ -860,8 +877,6 @@ contract Rent2Repay is AccessControl, Pausable {
         onlyRole(ADMIN_ROLE) 
     {
         // Secu Max 100%
-        if (newPercentage > 10000) revert InvalidDaoFeeReductionAmount();
-        
         uint256 oldPercentage = daoFeeReductionBPS;
         daoFeeReductionBPS = newPercentage;
         emit DaoFeeReductionPercentageUpdated(oldPercentage, newPercentage, msg.sender);
@@ -938,5 +953,13 @@ contract Rent2Repay is AccessControl, Pausable {
     ) {
         TokenConfig memory cfg = tokenConfig[token];
         return (cfg.token, cfg.debtToken, cfg.supplyToken, cfg.active);
+    }
+
+    /**
+     * @notice Returns the version of the contract
+     * @return Version string
+     */
+    function version() external pure returns (string memory) {
+        return "1.0.0";
     }
 } 

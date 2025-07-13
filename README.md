@@ -52,7 +52,7 @@
 ## 📋 How It Works
 
 ### Overview
-Rent2Repay is a smart contract system that enables automated debt repayments through a Risk Management Module (RMM). Users can configure weekly spending limits per token, allowing anyone to trigger repayments on their behalf.
+Rent2Repay is a smart contract system that enables automated debt repayments through a RealT Money Maker (RMM). Users can configure weekly spending limits per token, allowing anyone to trigger repayments on their behalf.
 
 ### Key Features
 - **Multi-token support**: Configure different limits for different ERC20 tokens
@@ -61,6 +61,8 @@ Rent2Repay is a smart contract system that enables automated debt repayments thr
 - **Fee system**: DAO fees and executor tips incentivize the system
 - **Role-based access**: Admin, operator, and emergency roles for system management
 - **Pausable**: Emergency pause functionality
+- **Upgradeable**: Proxy-based upgradeable contract architecture with OpenZeppelin
+- **Reentrancy protection**: Built-in protection against reentrancy attacks
 
 ### Workflow
 1. **User Configuration**: Users set weekly spending limits for specific tokens
@@ -76,6 +78,11 @@ Rent2Repay is a smart contract system that enables automated debt repayments thr
 - `npm test` - Run all tests
 - `npm run coverage` - Generate test coverage report
 - `npm run deploy:local` - Deploy contracts to local network
+
+### Upgradeable Contract Scripts
+- `npm run deploy:upgradable` - Deploy upgradeable contracts with proxy
+- `npm run upgrade:contract` - Upgrade existing contract to new implementation
+- `npm run test:upgrade` - Run upgrade-specific tests
 
 ### Development Tools
 - `npm run lint` - Lint Solidity code
@@ -95,10 +102,10 @@ Rent2Repay is a smart contract system that enables automated debt repayments thr
 
 #### Core Contracts
 - **`Rent2Repay.sol`** - Main contract managing user configurations and repayments
-- **`IRMM.sol`** - Interface for Risk Management Module integration
+- **`IRMM.sol`** - Interface for RealT Money Maker integration
 
 #### Mock Contracts (for testing)
-- **`MockRMM.sol`** - Mock Risk Management Module
+- **`MockRMM.sol`** - Mock RealT Money Maker
 - **`MockERC20.sol`** - Mock ERC20 token for testing
 - **`MockDebtToken.sol`** - Mock debt token for testing
 
@@ -118,12 +125,43 @@ struct TokenConfig {
 - Weekly spending limits per token
 - Timestamp tracking for period resets
 - Fee calculation and distribution
-- Integration with Risk Management Module
+- Integration with RealT Money Maker
 
 #### Role System
 - **Admin**: Configure system parameters, authorize tokens
 - **Operator**: Remove users, manage operations
 - **Emergency**: Pause/unpause system in emergencies
+
+### Upgradeable Architecture
+
+#### Proxy Pattern
+The Rent2Repay contract uses OpenZeppelin's upgradeable proxy pattern:
+- **Proxy Contract**: Holds the state and delegates calls to implementation
+- **Implementation Contract**: Contains the logic and can be upgraded
+- **ProxyAdmin**: Manages upgrades (controlled by admin role)
+
+#### Initialization
+```solidity
+function initialize(
+    address admin,
+    address emergency, 
+    address operator,
+    address _rmm,
+    // ... token addresses
+) external initializer
+```
+
+#### Security Features
+- **ReentrancyGuard**: Protection against reentrancy attacks on all state-changing functions
+- **Initializer**: Prevents multiple initialization of the proxy
+- **Access Control**: Role-based permissions preserved across upgrades
+- **Pausable**: Emergency pause functionality maintained
+
+#### Upgrade Process
+1. Deploy new implementation contract
+2. Call `upgradeProxy()` with new implementation address
+3. State is preserved, only logic is updated
+4. Version tracking through `version()` function
 
 ## 📁 Project Structure
 
@@ -134,15 +172,18 @@ rent2repay/
 │   ├── interfaces/           # Contract interfaces
 │   │   └── IRMM.sol          # RMM interface
 │   └── mocks/                # Mock contracts for testing
-│       ├── MockRMM.sol       # Mock Risk Management Module
+│       ├── MockRMM.sol       # Mock RealT Money Maker
 │       ├── MockERC20.sol     # Mock ERC20 token
 │       └── MockDebtToken.sol # Mock debt token
 ├── test/                     # Test files
 │   ├── Rent2Repay.test.js   # Main contract tests
 │   ├── Rent2Repay.batch.js  # Batch operation tests
+│   ├── Rent2Repay.upgrade.test.js # Upgrade functionality tests
 │   └── utils/               # Test utilities
 ├── scripts/                  # Deployment and utility scripts
 │   ├── deploy-local.js      # Local deployment script
+│   ├── deploy-upgradable.js # Upgradeable deployment script
+│   ├── upgrade-contract.js  # Contract upgrade script
 │   └── cli/                 # CLI utilities
 │       ├── demo-complete.js # Complete demo script
 │       ├── show-status.js   # Status display
@@ -174,6 +215,32 @@ Contracts are deployed with initial token configurations:
 - USDC token and debt token pair
 - Configurable fee structure
 
+### Upgradeable Deployment
+For upgradeable contracts, use the dedicated deployment script:
+
+```bash
+# Deploy upgradeable contracts with proxy
+npm run deploy:upgradable
+
+# Deploy to specific network
+npx hardhat run scripts/deploy-upgradable.js --network [network-name]
+```
+
+**Upgrade Process:**
+```bash
+# Upgrade existing proxy to new implementation
+npm run upgrade:contract
+
+# Upgrade on specific network
+npx hardhat run scripts/upgrade-contract.js --network [network-name]
+```
+
+**Key Benefits:**
+- State preservation during upgrades
+- No need to migrate user configurations
+- Seamless upgrade process for bug fixes and feature additions
+- Version tracking and upgrade history
+
 ## 🧪 Testing
 
 ### Test Coverage
@@ -183,6 +250,9 @@ The project includes comprehensive tests covering:
 - Fee calculation and distribution
 - Role-based access control
 - Error handling and edge cases
+- Upgradeable contract functionality
+- Reentrancy protection
+- State preservation across upgrades
 
 ### Running Tests
 ```bash
@@ -192,12 +262,30 @@ npm test
 # Run specific test file
 npx hardhat test test/Rent2Repay.test.js
 
+# Run upgrade tests only
+npm run test:upgrade
+
 # Run with coverage
 npm run coverage
 
 # Run specific test pattern
 npx hardhat test --grep "repayment"
 ```
+
+### Upgrade Testing
+The upgrade functionality is thoroughly tested with dedicated test cases:
+
+```bash
+# Run upgrade-specific tests
+npm run test:upgrade
+```
+
+**Upgrade Test Coverage:**
+- Contract initialization and version tracking
+- State preservation during upgrades
+- Role preservation across upgrades
+- Reentrancy protection verification
+- Proxy functionality validation
 
 ### Test Structure
 - **Unit Tests**: Individual function testing
@@ -221,6 +309,14 @@ npx hardhat test --grep "repayment"
 - Fee caps to prevent exploitation
 - Weekly limits to control exposure
 - Debt validation through RMM integration
+
+### Upgrade Security
+- **Proxy Pattern**: Uses OpenZeppelin's battle-tested proxy implementation
+- **Access Control**: Only admin role can perform upgrades
+- **Initialization Protection**: Prevents multiple initialization attempts
+- **State Safety**: Storage layout compatibility enforced
+- **Reentrancy Guard**: Protection maintained across all upgrades
+- **Version Tracking**: Contract version monitoring for audit trails
 
 ## 📚 Documentation
 
@@ -283,8 +379,14 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🔮 Future Enhancements
 
-- Multi-chain support
-- Advanced fee structures
-- Integration with additional DeFi protocols
-- Mobile-friendly interface
-- Automated monitoring and alerts
+The upgradeable architecture enables seamless implementation of future features:
+
+- **Multi-chain support**: Deploy to additional networks without state migration
+- **Advanced fee structures**: Implement new fee models through contract upgrades
+- **Integration with additional DeFi protocols**: Add new protocol integrations
+- **Enhanced security features**: Upgrade security mechanisms as best practices evolve
+- **Performance optimizations**: Implement gas optimizations in future versions
+- **Mobile-friendly interface**: Develop frontend with maintained backend compatibility
+- **Automated monitoring and alerts**: Add monitoring without disrupting existing functionality
+
+*All future enhancements can be deployed without affecting existing user configurations or requiring data migration.*
