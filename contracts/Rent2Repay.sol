@@ -256,15 +256,6 @@ contract Rent2Repay is AccessControl, Pausable {
     }
 
     /**
-     * @notice Validates that an amount is greater than zero
-     * @param amount The amount to validate
-     */
-    modifier validAmount(uint256 amount) {
-        if (amount == 0) revert AmountMustBeGreaterThanZero();
-        _;
-    }
-
-    /**
      * @notice Validates that a user has configured Rent2Repay for any token
      * @param user The user address to validate
      */
