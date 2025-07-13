@@ -7,7 +7,7 @@ import "hardhat/console.sol";
 
 /**
  * @title MockRMM
- * @notice Mock du Risk Management Module qui simule le comportement du vrai RMM
+ * @notice Mock du RMM qui simule le comportement du vrai RMM
  * @dev Ce mock simplifie le comportement du RMM pour les tests locaux
  */
 contract MockRMM is IRMM {
@@ -128,19 +128,11 @@ contract MockRMM is IRMM {
     }
 
     function withdraw(address asset, uint256 amount, address to) external override returns (uint256) {
-        console.log("rmm.asset addr", asset);
         require(tokenToSupplyToken[asset] != address(0), "Token not supported");
         address supplyToken = tokenToSupplyToken[asset];
-        console.log("rmm.supplyToken addr", supplyToken);
-   
         require(IERC20(supplyToken).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
 
-        uint256 tmpbalance2 = IERC20(asset).balanceOf(address(this));
-        console.log("rmm.tmpbalance stable", tmpbalance2);
-
         require(IERC20(asset).transfer(to, amount), "Transfer from failed");
-        tmpbalance2 = IERC20(asset).balanceOf(address(this));
-        console.log("rmm.tmpbalance stable after", tmpbalance2);
         emit Withdrawn(asset, amount, to);
         return amount;
     }

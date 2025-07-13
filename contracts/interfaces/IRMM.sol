@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title IRMM
- * @notice Interface for Risk Management Module (RMM) repayment functionality
+ * @notice Interface for RMM repayment functionality
  * @dev Based on the RMM contract functionality for debt repayment
  */
 interface IRMM {
