@@ -427,8 +427,25 @@ contract Rent2Repay is AccessControl, Pausable {
             );
         }
 
+        // Ajuster les frais en fonction de la différence si nécessaire
+        uint256 adjustedDaoFees = daoFees;
+        uint256 adjustedSenderTips = senderTips;
+        
+        if(difference > 0 && tokenConfig[token].token == token) {
+            // Si la différence est renvoyée dans le même token que les frais,
+            // on réduit les frais par la différence
+            adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
+            adjustedSenderTips = senderTips;
+            
+            // Si on a encore une différence, on la soustrait des sender tips
+            uint256 remainingDifference = difference > daoFees ? difference - daoFees : 0;
+            if(remainingDifference > 0) {
+                adjustedSenderTips = senderTips > remainingDifference ? senderTips - remainingDifference : 0;
+            }
+        }
+
         // Transfer fees to respective addresses
-        _transferFees(token, daoFees, senderTips);
+        _transferFees(token, adjustedDaoFees, adjustedSenderTips);
 
         // Update timestamp and emit event
         _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
@@ -497,6 +514,22 @@ contract Rent2Repay is AccessControl, Pausable {
                     IERC20(tokenConfig[token].token).transfer(user, difference),
                     "transfer to user failed"
                 );
+                
+                // Ajuster les frais accumulés en fonction de la différence
+                if(tokenConfig[token].token == token) {
+                    uint256 adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
+                    uint256 adjustedSenderTips = senderTips;
+                    
+                    // Si on a encore une différence, on la soustrait des sender tips
+                    uint256 remainingDifference = difference > daoFees ? difference - daoFees : 0;
+                    if(remainingDifference > 0) {
+                        adjustedSenderTips = senderTips > remainingDifference ? senderTips - remainingDifference : 0;
+                    }
+                    
+                    // Ajuster les totaux
+                    totalDaoFees = totalDaoFees - daoFees + adjustedDaoFees;
+                    totalSenderTips = totalSenderTips - senderTips + adjustedSenderTips;
+                }
             }
 
             _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);

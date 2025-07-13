@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "hardhat test",
+    "coverage": "hardhat coverage",
     "compile": "hardhat compile",
     "docs": "hardhat docgen",
     "docs:clean": "rm -rf docs && hardhat docgen",

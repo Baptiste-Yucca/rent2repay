@@ -172,4 +172,182 @@ describe("Rent2Repay", function () {
         // Vérifier que l'utilisateur n'est plus autorisé
         expect(await rent2Repay.isAuthorized(addr1.address)).to.be.false;
     });
+
+    it("Devrait effectuer un remboursement avec différence > 0 (mode 1)", async function () {
+        const weeklyLimit = ethers.parseUnits("100", 18);
+        const debtAmount = ethers.parseUnits("200", 18); // Augmenté pour couvrir les frais
+        const tokenAmount = ethers.parseUnits("1000", 18);
+
+        // Configuration
+        await rent2Repay.connect(addr1).configureRent2Repay(
+            [await wxdaiToken.getAddress()],
+            [weeklyLimit],
+            1, // 1 seconde pour le test
+            Math.floor(Date.now() / 1000)
+        );
+
+        // Préparation des tokens
+        await wxdaiToken.mint(addr1.address, tokenAmount);
+        await wxdaiDebtToken.mint(addr1.address, debtAmount);
+
+        // Approvals
+        await wxdaiToken.connect(addr1).approve(await rent2Repay.getAddress(), tokenAmount);
+        await wxdaiDebtToken.connect(addr1).approve(await mockRMM.getAddress(), debtAmount);
+
+        // Vérifier le mode initial
+        expect(await mockRMM.getMode()).to.equal(0);
+
+        // Modifier le mode à 1
+        await mockRMM.setMode(1);
+
+        // Vérifier le mode modifié
+        expect(await mockRMM.getMode()).to.equal(1);
+
+        // Balances avant
+        const userBalanceBefore = await wxdaiToken.balanceOf(addr1.address);
+        const userDebtBalanceBefore = await wxdaiDebtToken.balanceOf(addr1.address);
+
+        // Exécuter le remboursement
+        await rent2Repay.connect(owner).rent2repay(addr1.address, await wxdaiToken.getAddress());
+
+        // Balances après
+        const userBalanceAfter = await wxdaiToken.balanceOf(addr1.address);
+        const userDebtBalanceAfter = await wxdaiDebtToken.balanceOf(addr1.address);
+
+        // Vérifications
+        // L'utilisateur devrait avoir reçu 100 wei de différence
+        // mais les frais sont ajustés, donc il reçoit aussi la réduction des frais
+        expect(userBalanceAfter).to.be.greaterThan(userBalanceBefore - weeklyLimit);
+
+        // En mode 1, la différence de 100 wei réduit les frais, donc l'utilisateur récupère plus
+        const expectedBalance = userBalanceBefore - weeklyLimit + 100n;
+        expect(userBalanceAfter).to.be.greaterThanOrEqual(expectedBalance);
+
+        // La dette devrait avoir été réduite de weeklyLimit - fees - 100 wei (car RMM mode 1 soustrait 100 wei)
+        // Calculer les frais attendus : 0.5% DAO + 0.25% sender = 0.75% total
+        const expectedFees = (weeklyLimit * 75n) / 10000n; // 0.75% de 100 ether = 750 wei
+        const expectedDebtReduction = weeklyLimit - expectedFees - 100n; // montant pour repay - différence RMM
+        expect(userDebtBalanceAfter).to.equal(userDebtBalanceBefore - expectedDebtReduction);
+
+        // Remettre le mode à 0
+        await mockRMM.setMode(0);
+        expect(await mockRMM.getMode()).to.equal(0);
+    });
+
+    it("Devrait tester les fonctions de gestion du mode RMM", async function () {
+        // Test mode initial
+        expect(await mockRMM.getMode()).to.equal(0);
+
+        // Test changement de mode
+        await mockRMM.setMode(1);
+        expect(await mockRMM.getMode()).to.equal(1);
+
+        // Test retour au mode 0
+        await mockRMM.setMode(0);
+        expect(await mockRMM.getMode()).to.equal(0);
+
+        // Test changement de mode vers 2
+        await mockRMM.setMode(2);
+        expect(await mockRMM.getMode()).to.equal(2);
+
+        // Test de la différence personnalisée
+        await mockRMM.setCustomDifference(1000);
+        expect(await mockRMM.getCustomDifference()).to.equal(1000);
+
+        // Test mode invalide
+        await expect(mockRMM.setMode(3)).to.be.revertedWith("Mode must be 0, 1, or 2");
+    });
+
+    it("Devrait ajuster les sender tips quand la différence est plus grande que les frais DAO", async function () {
+        const weeklyLimit = ethers.parseUnits("100", 18);
+        const debtAmount = ethers.parseUnits("200", 18);
+        const tokenAmount = ethers.parseUnits("1000", 18);
+
+        // Configuration
+        await rent2Repay.connect(addr1).configureRent2Repay(
+            [await wxdaiToken.getAddress()],
+            [weeklyLimit],
+            1,
+            Math.floor(Date.now() / 1000)
+        );
+
+        // Préparation des tokens
+        await wxdaiToken.mint(addr1.address, tokenAmount);
+        await wxdaiDebtToken.mint(addr1.address, debtAmount);
+
+        // Approvals
+        await wxdaiToken.connect(addr1).approve(await rent2Repay.getAddress(), tokenAmount);
+        await wxdaiDebtToken.connect(addr1).approve(await mockRMM.getAddress(), debtAmount);
+
+        // Calculer les frais DAO (0.5% de 100 ether) + 200 wei pour dépasser
+        const expectedDaoFees = (weeklyLimit * 50n) / 10000n; // 0.5% = 50 BPS
+        const bigDifference = expectedDaoFees + 200n; // Plus que les frais DAO
+
+        // Configurer le mode personnalisé avec une différence importante
+        await mockRMM.setMode(2);
+        await mockRMM.setCustomDifference(bigDifference);
+
+        // Vérifier la configuration
+        expect(await mockRMM.getMode()).to.equal(2);
+        expect(await mockRMM.getCustomDifference()).to.equal(bigDifference);
+
+        // Balances avant
+        const userBalanceBefore = await wxdaiToken.balanceOf(addr1.address);
+
+        // Exécuter le remboursement
+        await rent2Repay.connect(owner).rent2repay(addr1.address, await wxdaiToken.getAddress());
+
+        // Balances après
+        const userBalanceAfter = await wxdaiToken.balanceOf(addr1.address);
+
+        // Vérifier que l'utilisateur a récupéré sa différence et les ajustements de frais
+        expect(userBalanceAfter).to.be.greaterThan(userBalanceBefore - weeklyLimit);
+
+        // Remettre le mode à 0
+        await mockRMM.setMode(0);
+    });
+
+    it("Devrait gérer une différence égale aux frais DAO totaux", async function () {
+        const weeklyLimit = ethers.parseUnits("100", 18);
+        const debtAmount = ethers.parseUnits("200", 18);
+        const tokenAmount = ethers.parseUnits("1000", 18);
+
+        // Configuration
+        await rent2Repay.connect(addr1).configureRent2Repay(
+            [await wxdaiToken.getAddress()],
+            [weeklyLimit],
+            1,
+            Math.floor(Date.now() / 1000)
+        );
+
+        // Préparation des tokens
+        await wxdaiToken.mint(addr1.address, tokenAmount);
+        await wxdaiDebtToken.mint(addr1.address, debtAmount);
+
+        // Approvals
+        await wxdaiToken.connect(addr1).approve(await rent2Repay.getAddress(), tokenAmount);
+        await wxdaiDebtToken.connect(addr1).approve(await mockRMM.getAddress(), debtAmount);
+
+        // Calculer les frais DAO exacts (0.5% de 100 ether)
+        const expectedDaoFees = (weeklyLimit * 50n) / 10000n; // 0.5% = 50 BPS
+
+        // Configurer le mode personnalisé avec une différence exactement égale aux frais DAO
+        await mockRMM.setMode(2);
+        await mockRMM.setCustomDifference(expectedDaoFees);
+
+        // Balances avant
+        const userBalanceBefore = await wxdaiToken.balanceOf(addr1.address);
+
+        // Exécuter le remboursement
+        await rent2Repay.connect(owner).rent2repay(addr1.address, await wxdaiToken.getAddress());
+
+        // Balances après
+        const userBalanceAfter = await wxdaiToken.balanceOf(addr1.address);
+
+        // Vérifier que l'utilisateur a récupéré sa différence
+        expect(userBalanceAfter).to.be.greaterThan(userBalanceBefore - weeklyLimit);
+
+        // Remettre le mode à 0
+        await mockRMM.setMode(0);
+    });
 }); 
