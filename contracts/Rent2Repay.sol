@@ -7,8 +7,6 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IRMM.sol";
-// Import pour le debugging - à retirer en production
-import "hardhat/console.sol";
 
 /**
  * @title Rent2Repay
@@ -77,7 +75,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     uint256 public daoFeeReductionMinimumAmount;
 
     /// @notice DAO fee reduction percentage in basis points (BPS) - 10000 = 100% 
-    /// (exonération totale)
     uint256 public daoFeeReductionBPS;
 
     /// @notice DAO treasury address that receives DAO fees
@@ -420,7 +417,7 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
             require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
             uint256 withdrawnAmount = rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
             require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
-            // comment securiser ? 
+            // HOWTO secure ? 
             // withdrawnAmunt < ampour for repay
         }
 
@@ -443,17 +440,13 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
             );
         }
 
-        // Ajuster les frais en fonction de la différence si nécessaire
+        // Ajust fees if there is difference
         uint256 adjustedDaoFees = daoFees;
         uint256 adjustedSenderTips = senderTips;
         
         if(difference > 0 && tokenConfig[token].token == token) {
-            // Si la différence est renvoyée dans le même token que les frais,
-            // on réduit les frais par la différence
             adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
             adjustedSenderTips = senderTips;
-            
-            // Si on a encore une différence, on la soustrait des sender tips
             uint256 remainingDifference = difference > daoFees ? difference - daoFees : 0;
             if(remainingDifference > 0) {
                 adjustedSenderTips = senderTips > remainingDifference ? senderTips - remainingDifference : 0;
@@ -531,19 +524,13 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
                     IERC20(tokenConfig[token].token).transfer(user, difference),
                     "transfer to user failed"
                 );
-                
-                // Ajuster les frais accumulés en fonction de la différence
                 if(tokenConfig[token].token == token) {
                     uint256 adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
                     uint256 adjustedSenderTips = senderTips;
-                    
-                    // Si on a encore une différence, on la soustrait des sender tips
                     uint256 remainingDifference = difference > daoFees ? difference - daoFees : 0;
                     if(remainingDifference > 0) {
                         adjustedSenderTips = senderTips > remainingDifference ? senderTips - remainingDifference : 0;
                     }
-                    
-                    // Ajuster les totaux
                     totalDaoFees = totalDaoFees - daoFees + adjustedDaoFees;
                     totalSenderTips = totalSenderTips - senderTips + adjustedSenderTips;
                 }
@@ -733,10 +720,7 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         // Calculate base fees
         daoFees = (amount * daoFeesBPS) / 10000;
         senderTips = (amount * senderTipsBPS) / 10000;
-        
-        // Check if user qualifies for DAO fee reduction
-        // cas si amount > totalfees divison euclidiennes??
-        //
+
         if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
             uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
             if (userBalance >= daoFeeReductionMinimumAmount) {
@@ -747,7 +731,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         }
         
         uint256 totalFees = daoFees + senderTips;   
-        // SECU to move on main fct ? if fees > 100 revert
         if(totalFees > amount) revert("Exceed amount");
         amountForRepayment = amount - totalFees;
     }
@@ -777,7 +760,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        // Secu Max 100%
         if (newFeesBPS + senderTipsBPS > 10000) revert InvalidFeesBPS();
         
         uint256 oldFees = daoFeesBPS;
@@ -794,7 +776,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        // Secu Max 100%
         if (daoFeesBPS + newTipsBPS > 10000) revert InvalidTipsBPS();
         
         uint256 oldTips = senderTipsBPS;
@@ -876,7 +857,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        // Secu Max 100%
         uint256 oldPercentage = daoFeeReductionBPS;
         daoFeeReductionBPS = newPercentage;
         emit DaoFeeReductionPercentageUpdated(oldPercentage, newPercentage, msg.sender);
