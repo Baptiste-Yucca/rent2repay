@@ -16,24 +16,20 @@ import "./interfaces/IRMM.sol";
  * for automated repayments. Users can set a maximum amount per token that can be
  * spent per week and tracks usage separately
  */
-contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
-    /// @notice Constant for one week in seconds
-    uint256 private constant _WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
-
+contract Rent2Repay is 
+    Initializable, 
+    AccessControlUpgradeable, 
+    PausableUpgradeable, 
+    ReentrancyGuardUpgradeable 
+{
+   
     /// @notice Role definitions
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
-    /// @notice Structure to represent a token pair (token + debt token)
-    struct TokenPair {
-        address token;
-        address debtToken;
-    }
-
     struct TokenConfig {
         address token;
-        address debtToken;
         address supplyToken;
         bool active;
     }
@@ -80,18 +76,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     /// @notice DAO treasury address that receives DAO fees
     address public daoTreasuryAddress;
 
-    /// @notice Emitted when a user configures the Rent2Repay mechanism for a specific token
-    /// @param user The user address that configured the system
-    /// @param token The token address configured
-    /// @param weeklyMaxAmount The weekly maximum amount set by the user for this token
-    /// @param periodicity The periodicity of the repayment
-    event Rent2RepayConfigured(
-        address indexed user, 
-        address[] token, 
-        uint256[] weeklyMaxAmount,
-        uint256 periodicity
-    );
-
     /// @notice Emitted when a user revokes their Rent2Repay authorization for a specific token
     /// @param user The user address that revoked authorization
     /// @param token The token address revoked
@@ -100,11 +84,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     /// @notice Emitted when a user revokes all their Rent2Repay authorizations
     /// @param user The user address that revoked all authorizations
     event Rent2RepayRevokedAll(address indexed user);
-
-    /// @notice Emitted when an operator forcibly removes a user
-    /// @param operator The operator who removed the user
-    /// @param user The user that was removed
-    event UserRemovedByOperator(address indexed operator, address indexed user);
 
     /// @notice Emitted when a repayment is executed
     /// @param user The user for whom the repayment was executed
@@ -120,20 +99,15 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         address indexed executor
     );
 
-    /// @notice Emitted when a token is authorized
-    /// @param token The token address that was authorized
-    event TokenAuthorized(address indexed token);
-
     /// @notice Emitted when a token is unauthorized
     /// @param token The token address that was unauthorized
     event TokenUnauthorized(address indexed token);
 
     /// @notice Emitted when a token pair is authorized
     /// @param token The token address that was authorized
-    /// @param debtToken The debt token address associated with the token
-    event TokenTripleAuthorized(
+    /// @param supplyToken The supply token address associated with the token
+    event TokenPairAuthorized(
         address indexed token, 
-        address indexed debtToken, 
         address indexed supplyToken
     );
 
@@ -200,24 +174,14 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     );
 
     /// @notice Custom errors for better gas efficiency
-    error AmountMustBeGreaterThanZero();
     error UserNotAuthorized();
-    error UserNotAuthorizedForToken();
-    error WeeklyLimitExceeded();
-    error OnlyUserCanRevokeOwn();
     error InvalidUserAddress();
     error InvalidTokenAddress();
-    error CannotRepayForSelf();
     error ContractPaused();
     error TokenNotAuthorized();
-    error TokenAlreadyAuthorized();
-    error TokenNotFound();
-    error TokenStillAuthorized();
-    error NoDebtTokenAssociated();
     error InvalidFeesBPS();
     error InvalidTipsBPS();
-    error InvalidDaoFeeReductionToken();
-    error InvalidDaoFeeReductionAmount();
+
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -231,9 +195,9 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
      * @param operator Address that will have operator privileges
      * @param _rmm Address of the RMM contract
      * @param wxdaiToken Address of the WXDAI token
-     * @param wxdaiDebtToken Address of the WXDAI debt token
+     * @param wxdaiArmmToken Address of the WXDAI supply token
      * @param usdcToken Address of the USDC token
-     * @param usdcDebtToken Address of the USDC debt token
+     * @param usdcArmmToken Address of the USDC supply token
      */
     function initialize(
         address admin, 
@@ -241,10 +205,8 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         address operator,
         address _rmm,
         address wxdaiToken,
-        address wxdaiDebtToken,
         address wxdaiArmmToken,
         address usdcToken,
-        address usdcDebtToken,
         address usdcArmmToken
     ) external initializer {
         __AccessControl_init();
@@ -264,8 +226,8 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         daoFeeReductionBPS = 5000; // 50% default
         
         // Initialize with WXDAI and USDC as authorized token pairs
-        _authorizeTokenPair(wxdaiToken, wxdaiDebtToken, wxdaiArmmToken);
-        _authorizeTokenPair(usdcToken, usdcDebtToken, usdcArmmToken);
+        _authorizeTokenPair(wxdaiToken, wxdaiArmmToken);
+        _authorizeTokenPair(usdcToken, usdcArmmToken);
     }
 
     /**
@@ -274,15 +236,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
      */
     modifier userIsAuthorized(address user) {
         if (!isAuthorized(user)) revert UserNotAuthorized();
-        _;
-    }
-
-    /**
-     * @notice Validates that an address is not the zero address
-     * @param addr The address to validate
-     */
-    modifier validAddress(address addr) {
-        if (addr == address(0)) revert InvalidUserAddress();
         _;
     }
 
@@ -314,17 +267,20 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         uint256[] calldata amounts,
         uint256  period,
         uint256  _timestamp
-    ) external whenNotPaused nonReentrant {
-        require(tokens.length > 0 && tokens.length == amounts.length, "Invalid array lengths");
-            for (uint256 i = 0; i < tokens.length; i++) {
+    ) external whenNotPaused {
+        uint256 len = tokens.length;
+        require(len > 0 && len == amounts.length, "Invalid array lengths");
+            for (uint256 i = 0; i < len;) {
                 require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
                     "Invalid token or amount");
                 allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
-                periodicity[msg.sender][tokens[i]] = period == 0 ? _WEEK_IN_SECONDS : period;
+                periodicity[msg.sender][tokens[i]] = period == 1 ? 1 weeks : period;
+                unchecked { ++i; }
             }
-        // Initialize lastRepayTimestamp if it's the first configuration
-        lastRepayTimestamps[msg.sender] = _timestamp;
-        emit Rent2RepayConfigured(msg.sender, tokens, amounts, period);
+        // Initialize/activate user with timestamp (0 = inactive, !=0 = active)
+        if (lastRepayTimestamps[msg.sender] == 0) {
+            lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
+        }
     }
 
     /**
@@ -332,6 +288,7 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
      */
     function revokeRent2RepayAll() external userIsAuthorized(msg.sender) {
         _removeUserAllTokens(msg.sender);
+        emit Rent2RepayRevokedAll(msg.sender);
     }
 
     /**
@@ -345,6 +302,7 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         userIsAuthorized(user) 
     {
         _removeUserAllTokens(user);
+        emit Rent2RepayRevokedAll(user);
     }
 
     /**
@@ -362,23 +320,18 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     }
 
     /**
-     * @notice Checks if a user has authorized the Rent2Repay mechanism for any token
+     * @notice Checks if a user has authorized the Rent2Repay mechanism
      * @param user Address of the user to check
-     * @return true if authorized for at least one token, false otherwise
+     * @return true if authorized, false otherwise
      */
     function isAuthorized(address user) public view returns (bool) {
-        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            if (tokenConfig[_authorizedTokensList[i]].active && 
-                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
-                return true;
-            }
-        }
-        return false;
+        return lastRepayTimestamps[user] != 0;
     }
     
 
     // Helper function to perform security checks and configuration validation
     function _validateUserAndToken(address user, address token) internal view {
+        require(lastRepayTimestamps[user] != 0, "User not authorized");
         require(allowedMaxAmounts[user][token] > 0, "User not configured for token");
         require(periodicity[user][token] > 0, "Periodicity not set");
         require(_isNewPeriod(user, token), "Wait next period");
@@ -387,15 +340,12 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     function rent2repay(address user, address token) 
         external 
         whenNotPaused
-        validAddress(user)
         validTokenAddress(token)
         onlyAuthorizedToken(token)
         nonReentrant
         returns (bool) 
     {
         _validateUserAndToken(user, token);
-
-        bool isSupplyToken = tokenConfig[token].supplyToken == token;
    
         uint256 amount = allowedMaxAmounts[user][token];
         uint256 balance = IERC20(token).balanceOf(user);
@@ -413,16 +363,23 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
             "transferFrom to R2R failed"
         );
 
-        if(isSupplyToken) {
+        if(tokenConfig[token].supplyToken == token) {
             require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
-            uint256 withdrawnAmount = rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
+            uint256 withdrawnAmount = rmm.withdraw(
+                tokenConfig[token].token, 
+                amountForRepayment, 
+                address(this)
+            );
             require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
             // HOWTO secure ? 
             // withdrawnAmunt < ampour for repay
         }
 
         // force repayement with stablecoin
-        require(IERC20(tokenConfig[token].token).approve(address(rmm), amountForRepayment), "Approve failed");
+        require(
+            IERC20(tokenConfig[token].token).approve(address(rmm), amountForRepayment), 
+            "Approve failed"
+        );
         
         uint256 actualAmountRepaid = rmm.repay(
             tokenConfig[token].token,
@@ -442,19 +399,13 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
 
         // Ajust fees if there is difference
         uint256 adjustedDaoFees = daoFees;
-        uint256 adjustedSenderTips = senderTips;
         
         if(difference > 0 && tokenConfig[token].token == token) {
-            adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
-            adjustedSenderTips = senderTips;
-            uint256 remainingDifference = difference > daoFees ? difference - daoFees : 0;
-            if(remainingDifference > 0) {
-                adjustedSenderTips = senderTips > remainingDifference ? senderTips - remainingDifference : 0;
-            }
+            adjustedDaoFees = daoFees > difference ? daoFees - difference : 0; 
         }
 
         // Transfer fees to respective addresses
-        _transferFees(token, adjustedDaoFees, adjustedSenderTips);
+        _transferFees(token, adjustedDaoFees, senderTips);
 
         // Update timestamp and emit event
         _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
@@ -473,21 +424,34 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         uint256 totalDaoFees = 0;
         uint256 totalSenderTips = 0;
         
-        for (uint256 i = 0; i < users.length; i++) {
-            address user = users[i];
+        // Declare all variables outside the loop for gas optimization
+        address user;
+        uint256 amount;
+        uint256 balance;
+        uint256 toTransfer;
+        uint256 daoFees;
+        uint256 senderTips;
+        uint256 amountForRepayment;
+        uint256 withdrawnAmount;
+        uint256 actualAmountRepaid;
+        uint256 difference;
+        uint256 adjustedDaoFees;
+        uint256 remainingDifference;
+        
+        for (uint256 i = 0; i < users.length;) {
+            user = users[i];
             require(user != address(0), "Invalid user address");
             
             _validateUserAndToken(user, token);
-            bool isSupplyToken = tokenConfig[token].supplyToken == token;
 
-            uint256 amount = allowedMaxAmounts[user][token];
-            uint256 balance = IERC20(token).balanceOf(user);
-            uint256 toTransfer = balance < amount ? balance : amount;
+            amount = allowedMaxAmounts[user][token];
+            balance = IERC20(token).balanceOf(user);
+            toTransfer = balance < amount ? balance : amount;
 
             (
-                uint256 daoFees,
-                uint256 senderTips,
-                uint256 amountForRepayment
+                daoFees,
+                senderTips,
+                amountForRepayment
             ) = _calculateFees(toTransfer, user);
 
             require(
@@ -498,9 +462,13 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
             totalDaoFees += daoFees;
             totalSenderTips += senderTips;
 
-            if(isSupplyToken) {
+            if(tokenConfig[token].supplyToken == token) {
                 require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
-                uint256 withdrawnAmount = rmm.withdraw(tokenConfig[token].token, amountForRepayment, address(this));
+                withdrawnAmount = rmm.withdraw(
+                    tokenConfig[token].token, 
+                    amountForRepayment, 
+                    address(this)
+                );
                 // see what happens on Gnossi chain
                 require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
             }
@@ -511,32 +479,27 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
                 "Approve failed"
             );
 
-            uint256 actualAmountRepaid = rmm.repay(
+            actualAmountRepaid = rmm.repay(
                 tokenConfig[token].token,
                 amountForRepayment,
                 DEFAULT_INTEREST_RATE_MODE,
                 user
             );
 
-            uint256 difference = amountForRepayment - actualAmountRepaid;
+            difference = amountForRepayment - actualAmountRepaid;
             if(difference > 0) {
                 require(
                     IERC20(tokenConfig[token].token).transfer(user, difference),
                     "transfer to user failed"
                 );
                 if(tokenConfig[token].token == token) {
-                    uint256 adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
-                    uint256 adjustedSenderTips = senderTips;
-                    uint256 remainingDifference = difference > daoFees ? difference - daoFees : 0;
-                    if(remainingDifference > 0) {
-                        adjustedSenderTips = senderTips > remainingDifference ? senderTips - remainingDifference : 0;
-                    }
+                    adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
                     totalDaoFees = totalDaoFees - daoFees + adjustedDaoFees;
-                    totalSenderTips = totalSenderTips - senderTips + adjustedSenderTips;
                 }
             }
 
             _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
+            unchecked { ++i; }
         }
         
         if (totalDaoFees > 0 || totalSenderTips > 0) {
@@ -553,11 +516,10 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     }
 
     function whoami() external view returns (bool isAdmin, bool isOperator, bool isEmergency) {
-        address sender = msg.sender;
         return (
-          hasRole(DEFAULT_ADMIN_ROLE, sender),
-          hasRole(OPERATOR_ROLE, sender),
-          hasRole(EMERGENCY_ROLE, sender)
+          hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+          hasRole(OPERATOR_ROLE, msg.sender),
+          hasRole(EMERGENCY_ROLE, msg.sender)
         );
     }
 
@@ -590,63 +552,62 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
      * @return tokens Array of authorized token addresses
      * @return maxAmounts Array of weekly max amounts for each token
      */
-    function getUserConfigs(address user) 
-        external 
-        view 
+    function getUserConfigs(address user)
+        external
+        view
         returns (
-            address[] memory tokens, 
+            address[] memory tokens,
             uint256[] memory maxAmounts
         )
     {
-        uint256 authorizedCount = 0;
-    
-        // Count authorized tokens for this user
-        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            if (tokenConfig[_authorizedTokensList[i]].active && 
-                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
-                authorizedCount++;
-            }
+        // If user is not authorized, return empty arrays
+        if (lastRepayTimestamps[user] == 0) {
+            return (new address[](0), new uint256[](0));
         }
-        
-        // Create arrays with the right size
-        tokens = new address[](authorizedCount);
-        maxAmounts = new uint256[](authorizedCount);
-        
-        // Fill arrays
-        uint256 index = 0;
-        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            if (tokenConfig[_authorizedTokensList[i]].active && 
-                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0) {
+
+        uint256 maxLength = _authorizedTokensList.length;
+        tokens = new address[](maxLength);
+        maxAmounts = new uint256[](maxLength);
+
+        uint256 index;
+        for (uint256 i = 0; i < maxLength; ) {
+            if (
+                tokenConfig[_authorizedTokensList[i]].active &&
+                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0
+            ) {
                 tokens[index] = _authorizedTokensList[i];
                 maxAmounts[index] = allowedMaxAmounts[user][_authorizedTokensList[i]];
-                index++;
+                unchecked { ++index; }
             }
+            unchecked { ++i; }
+        }
+
+        assembly {
+            mstore(tokens, index)
+            mstore(maxAmounts, index)
         }
     }
 
     /**
      * @notice Allows admins to authorize a new token pair
      * @param token The token address to authorize
-     * @param debtToken The debt token address associated with the token
      * @param supplyToken The supply token address associated with the token
      */
-    function authorizeTokenTriple(address token, address debtToken, address supplyToken) 
+    function authorizeTokenPair(address token, address supplyToken) 
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        _authorizeTokenPair(token, debtToken, supplyToken);
+        _authorizeTokenPair(token, supplyToken);
     }
 
     /**
      * @notice Internal function to authorize a token pair
      * @param token The token address to authorize
-     * @param debtToken The debt token address associated with the token
      * @param supplyToken The supply token address associated with the token
      */
-    function _authorizeTokenPair(address token, address debtToken, address supplyToken) internal {
+    function _authorizeTokenPair(address token, address supplyToken) internal {
         TokenConfig memory config = TokenConfig({
             token: token,
-            debtToken: debtToken,
             supplyToken: supplyToken,
             active: true
         });
@@ -654,7 +615,7 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         tokenConfig[token] = config;
         tokenConfig[supplyToken] = config;
         _authorizedTokensList.push(token);
-        emit TokenTripleAuthorized(token, debtToken, supplyToken);
+        emit TokenPairAuthorized(token, supplyToken);
     }
 
     /**
@@ -669,29 +630,44 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         tokenConfig[tokenConfig[token].supplyToken].active = false;
 
         // Remove from authorizedTokensList
-        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
+        for (uint256 i = 0; i < _authorizedTokensList.length;) {
             if (_authorizedTokensList[i] == token) {
                 _authorizedTokensList.pop();
                 break;
             }
+            unchecked { ++i; }
         }
         emit TokenUnauthorized(token);
     }
 
     /**
+     * @notice Revokes the Rent2Repay authorization for a specific token
+     * @dev Since Rent2Repay works with single token type, this disables the entire user
+     * @param token The token address to revoke authorization for
+     */
+    function revokeRent2RepayForToken(address token) 
+        external 
+        validTokenAddress(token)
+        onlyAuthorizedToken(token)
+    {
+        require(lastRepayTimestamps[msg.sender] != 0, "User not authorized");
+        require(allowedMaxAmounts[msg.sender][token] > 0, "User not configured for this token");
+        
+        // Disable the entire user (single timestamp optimization)
+        lastRepayTimestamps[msg.sender] = 0;
+        emit Rent2RepayRevoked(msg.sender, token);
+        emit Rent2RepayRevokedAll(msg.sender);
+    }
+
+    /**
      * @notice Internal function to remove a user from the system for all tokens
+     * @dev Optimized: Only disable user globally via timestamp (massive gas savings)
      * @param user The user to remove
      */
     function _removeUserAllTokens(address user) internal {
-        // NOTE Solidity: key removing is impossible
-        for (uint256 i = 0; i < _authorizedTokensList.length; i++) {
-            allowedMaxAmounts[user][tokenConfig[_authorizedTokensList[i]].supplyToken] = 0;
-            allowedMaxAmounts[user][_authorizedTokensList[i]] = 0;
-            periodicity[user][tokenConfig[_authorizedTokensList[i]].supplyToken] = 0;
-            periodicity[user][_authorizedTokensList[i]] = 0;
-        }
+        // Single SSTORE operation - massive gas optimization!
+        // Note: We keep allowedMaxAmounts and periodicity values for potential reactivation
         lastRepayTimestamps[user] = 0;
-        emit Rent2RepayRevokedAll(msg.sender);
     }
 
 
@@ -869,7 +845,6 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
     function updateDaoTreasuryAddress(address newAddress) 
         external 
         onlyRole(ADMIN_ROLE) 
-        validAddress(newAddress)
     {
         address oldAddress = daoTreasuryAddress;
         daoTreasuryAddress = newAddress;
@@ -908,31 +883,22 @@ contract Rent2Repay is Initializable, AccessControlUpgradeable, PausableUpgradea
         );
     }
 
-    /**
-     * @notice Gets the debt token address for a given token
-     * @param token The token address
-     * @return The debt token address associated with the token
-     */
-    function getDebtToken(address token) external view returns (address) {
-        return tokenConfig[token].debtToken;
-    }
+
 
     /**
      * @notice Gets the token configuration for a given token
      * @param token The token address
      * @return tokenAddress The token address
-     * @return debtToken The debt token address
      * @return supplyToken The supply token address
      * @return active Whether the token is active
      */
     function getTokenConfig(address token) external view returns (
         address tokenAddress,
-        address debtToken,
         address supplyToken,
         bool active
     ) {
         TokenConfig memory cfg = tokenConfig[token];
-        return (cfg.token, cfg.debtToken, cfg.supplyToken, cfg.active);
+        return (cfg.token, cfg.supplyToken, cfg.active);
     }
 
     /**
