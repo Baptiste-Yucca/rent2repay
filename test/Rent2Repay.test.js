@@ -350,4 +350,80 @@ describe("Rent2Repay", function () {
         // Remettre le mode à 0
         await mockRMM.setMode(0);
     });
+
+    describe("giveApproval", function () {
+        it("Devrait permettre à l'admin de configurer des approbations", async function () {
+            const { admin } = await setupRent2Repay();
+            const testAmount = ethers.parseUnits("1000", 18);
+
+            // Configurer une nouvelle approbation
+            await expect(
+                rent2Repay.connect(admin).giveApproval(
+                    await wxdaiToken.getAddress(),
+                    await mockRMM.getAddress(),
+                    testAmount
+                )
+            ).to.emit(rent2Repay, "ApprovalGiven")
+                .withArgs(
+                    await wxdaiToken.getAddress(),
+                    await mockRMM.getAddress(),
+                    testAmount,
+                    admin.address
+                );
+
+            // Vérifier que l'approbation a été configurée directement via IERC20
+            const allowance = await wxdaiToken.allowance(
+                await rent2Repay.getAddress(),
+                await mockRMM.getAddress()
+            );
+            expect(allowance).to.be.gte(testAmount);
+        });
+
+        it("Ne devrait pas permettre aux non-admins de configurer des approbations", async function () {
+            const testAmount = ethers.parseUnits("1000", 18);
+
+            await expect(
+                rent2Repay.connect(addr1).giveApproval(
+                    await wxdaiToken.getAddress(),
+                    await mockRMM.getAddress(),
+                    testAmount
+                )
+            ).to.be.reverted;
+        });
+
+        it("Devrait rejeter les adresses invalides", async function () {
+            const { admin } = await setupRent2Repay();
+            const testAmount = ethers.parseUnits("1000", 18);
+
+            // Test avec token address invalide
+            await expect(
+                rent2Repay.connect(admin).giveApproval(
+                    ethers.ZeroAddress,
+                    await mockRMM.getAddress(),
+                    testAmount
+                )
+            ).to.be.reverted;
+
+            // Test avec spender address invalide
+            await expect(
+                rent2Repay.connect(admin).giveApproval(
+                    await wxdaiToken.getAddress(),
+                    ethers.ZeroAddress,
+                    testAmount
+                )
+            ).to.be.reverted;
+        });
+
+        it("Devrait rejeter les montants zéro", async function () {
+            const { admin } = await setupRent2Repay();
+
+            await expect(
+                rent2Repay.connect(admin).giveApproval(
+                    await wxdaiToken.getAddress(),
+                    await mockRMM.getAddress(),
+                    0
+                )
+            ).to.be.reverted;
+        });
+    });
 }); 

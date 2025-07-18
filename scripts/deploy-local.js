@@ -290,6 +290,42 @@ async function main() {
         console.log(`   🪙 Token réduction: ${deployedAddresses.configuration.daoFeeReductionTokenAddress}`);
         console.log(`   🏦 Treasury: ${deployedAddresses.configuration.daoTreasuryAddress}`);
 
+        // ===== ÉTAPE 6: Configuration des approbations =====
+        console.log("\n📝 === ÉTAPE 6: Configuration des approbations ===");
+
+        // Configurer les approbations pour tous les tokens vers le RMM
+        const maxApproval = ethers.MaxUint256; // type(uint256).max
+
+        console.log("🔓 Configuration des approbations pour les tokens vers RMM...");
+
+        // Approbation pour USDC
+        await rent2Repay.giveApproval(usdcAddress, rmmAddress, maxApproval);
+        console.log("✅ Approbation configurée: USDC → RMM");
+
+        // Approbation pour WXDAI
+        await rent2Repay.giveApproval(wxdaiAddress, rmmAddress, maxApproval);
+        console.log("✅ Approbation configurée: WXDAI → RMM");
+
+        // Approbation pour armmUSDC (supply token)
+        await rent2Repay.giveApproval(armmUSDCAddress, rmmAddress, maxApproval);
+        console.log("✅ Approbation configurée: armmUSDC → RMM");
+
+        // Approbation pour armmWXDAI (supply token)
+        await rent2Repay.giveApproval(armmWXDAIAddress, rmmAddress, maxApproval);
+        console.log("✅ Approbation configurée: armmWXDAI → RMM");
+
+        // Vérifier les approbations directement via IERC20
+        console.log("\n🔍 Vérification des approbations:");
+        const usdcAllowance = await mockUSDC.allowance(rent2RepayAddress, rmmAddress);
+        const wxdaiAllowance = await mockWXDAI.allowance(rent2RepayAddress, rmmAddress);
+        const armmUSDCAllowance = await armmUSDC.allowance(rent2RepayAddress, rmmAddress);
+        const armmWXDAIAllowance = await armmWXDAI.allowance(rent2RepayAddress, rmmAddress);
+
+        console.log(`   USDC → RMM: ${usdcAllowance.toString()} (${usdcAllowance > 0n ? '✅' : '❌'})`);
+        console.log(`   WXDAI → RMM: ${wxdaiAllowance.toString()} (${wxdaiAllowance > 0n ? '✅' : '❌'})`);
+        console.log(`   armmUSDC → RMM: ${armmUSDCAllowance.toString()} (${armmUSDCAllowance > 0n ? '✅' : '❌'})`);
+        console.log(`   armmWXDAI → RMM: ${armmWXDAIAllowance.toString()} (${armmWXDAIAllowance > 0n ? '✅' : '❌'})`);
+
         console.log("\n✅ === DÉPLOIEMENT TERMINÉ AVEC SUCCÈS ===");
 
     } catch (error) {
@@ -297,8 +333,8 @@ async function main() {
         process.exit(1);
     }
 
-    // ===== ÉTAPE 6: Sauvegarder les adresses =====
-    console.log("\n📝 === ÉTAPE 6: Sauvegarde de la configuration ===");
+    // ===== ÉTAPE 7: Sauvegarder les adresses =====
+    console.log("\n📝 === ÉTAPE 7: Sauvegarde de la configuration ===");
 
     const configPath = path.join(__dirname, "tmp/", "deployed-contracts.json");
     fs.writeFileSync(configPath, JSON.stringify(deployedAddresses, null, 2));

@@ -175,6 +175,18 @@ contract Rent2Repay is
         address indexed executor
     );
 
+    /// @notice Emitted when an approval is given to an external contract
+    /// @param token The token address that was approved
+    /// @param spender The address that was approved to spend the tokens
+    /// @param amount The amount that was approved
+    /// @param admin The admin who gave the approval
+    event ApprovalGiven(
+        address indexed token,
+        address indexed spender,
+        uint256 amount,
+        address indexed admin
+    );
+
     /// @notice Custom errors for better gas efficiency
     error UserNotAuthorized();
     error InvalidUserAddress();
@@ -366,7 +378,6 @@ contract Rent2Repay is
         );
 
         if(tokenConfig[token].supplyToken == token) {
-            require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
             uint256 withdrawnAmount = rmm.withdraw(
                 tokenConfig[token].token, 
                 amountForRepayment, 
@@ -376,12 +387,6 @@ contract Rent2Repay is
             // HOWTO secure ? 
             // withdrawnAmunt < ampour for repay
         }
-
-        // force repayement with stablecoin
-        require(
-            IERC20(tokenConfig[token].token).approve(address(rmm), amountForRepayment), 
-            "Approve failed"
-        );
         
         uint256 actualAmountRepaid = rmm.repay(
             tokenConfig[token].token,
@@ -465,7 +470,11 @@ contract Rent2Repay is
             totalSenderTips += senderTips;
 
             if(tokenConfig[token].supplyToken == token) {
-                require(IERC20(token).approve(address(rmm), toTransfer), "Approve failed");
+                // Check if approval is sufficient for withdraw operation
+                require(
+                    IERC20(token).allowance(address(this), address(rmm)) >= toTransfer,
+                    "Insufficient approval for token"
+                );
                 withdrawnAmount = rmm.withdraw(
                     tokenConfig[token].token, 
                     amountForRepayment, 
@@ -474,12 +483,6 @@ contract Rent2Repay is
                 // see what happens on Gnossi chain
                 require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
             }
-
-            // force repayement with stablecoin
-            require(
-                IERC20(tokenConfig[token].token).approve(address(rmm), amountForRepayment),
-                "Approve failed"
-            );
 
             actualAmountRepaid = rmm.repay(
                 tokenConfig[token].token,
@@ -640,6 +643,33 @@ contract Rent2Repay is
             unchecked { ++i; }
         }
         emit TokenUnauthorized(token);
+    }
+
+    /**
+     * @notice Allows admins to give approval for tokens to external contracts
+     * @dev This function must be called before using rent2repay functions to approve tokens to RMM
+     * @param token The token address to approve
+     * @param spender The address that will be approved to spend the tokens (e.g., RMM contract)
+     * @param amount The amount to approve (use type(uint256).max for unlimited approval)
+     */
+    function giveApproval(
+        address token,
+        address spender,
+        uint256 amount
+    ) 
+        external 
+        onlyRole(ADMIN_ROLE)
+        validTokenAddress(token)
+    {
+        require(spender != address(0), "Invalid spender address");
+        require(amount > 0, "Amount must be greater than 0");
+        
+        require(
+            IERC20(token).approve(spender, amount),
+            "Approval failed"
+        );
+        
+        emit ApprovalGiven(token, spender, amount, msg.sender);
     }
 
     /**
@@ -901,6 +931,16 @@ contract Rent2Repay is
     ) {
         TokenConfig memory cfg = tokenConfig[token];
         return (cfg.token, cfg.supplyToken, cfg.active);
+    }
+
+    /**
+     * @notice Gets the current allowance for a token towards a spender
+     * @param token The token address
+     * @param spender The spender address (e.g., RMM contract)
+     * @return Current allowance amount
+     */
+    function getAllowance(address token, address spender) external view returns (uint256) {
+        return IERC20(token).allowance(address(this), spender);
     }
 
     /**

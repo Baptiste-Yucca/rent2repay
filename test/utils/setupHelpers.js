@@ -57,6 +57,13 @@ async function setupRent2Repay() {
     // Configurer l'adresse DAO treasury
     await rent2Repay.connect(admin).updateDaoTreasuryAddress(daoTreasury.address);
 
+    // Configurer les approbations pour les tokens vers le RMM
+    const maxApproval = ethers.MaxUint256;
+    await rent2Repay.connect(admin).giveApproval(await wxdaiToken.getAddress(), await mockRMM.getAddress(), maxApproval);
+    await rent2Repay.connect(admin).giveApproval(await usdcToken.getAddress(), await mockRMM.getAddress(), maxApproval);
+    await rent2Repay.connect(admin).giveApproval(await armmWXDAI.getAddress(), await mockRMM.getAddress(), maxApproval);
+    await rent2Repay.connect(admin).giveApproval(await armmUSDC.getAddress(), await mockRMM.getAddress(), maxApproval);
+
     return {
         rent2Repay,
         mockRMM,
