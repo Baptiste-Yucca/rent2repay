@@ -336,23 +336,67 @@ contract Rent2Repay is
         returns (uint256 adjustedDaoFees, uint256 senderTips, uint256 actualAmountRepaid) 
     {
         _validateUserAndToken(user, token);
-   
+        
+        // Étape 1: Calculer et transférer les tokens
+        uint256 daoFees;
+        uint256 amountForRepayment;
+        (daoFees, senderTips, amountForRepayment) = _handleTokenTransferAndFees(user, token);
+        
+        // Étape 2: Effectuer le remboursement via RMM et ajuster les fees
+        (actualAmountRepaid, adjustedDaoFees) = _handleRmmRepayment(
+            user, token, daoFees, senderTips, amountForRepayment
+        );
+        
+        lastRepayTimestamps[user] = block.timestamp;
+        // no emit, transfer ERC20, track them from TheGraph
+    }
+
+    /**
+     * @notice Internal function to handle token transfer and fee calculation
+     * @dev Reduces stack depth by separating token transfer logic
+     * @param user The user address
+     * @param token The token address
+     * @return daoFees The calculated DAO fees
+     * @return senderTips The calculated sender tips
+     * @return amountForRepayment The amount to be used for repayment
+     */
+    function _handleTokenTransferAndFees(address user, address token) 
+        internal 
+        returns (uint256 daoFees, uint256 senderTips, uint256 amountForRepayment) 
+    {
         uint256 amount = allowedMaxAmounts[user][token];
         uint256 balance = IERC20(token).balanceOf(user);
         uint256 toTransfer = balance < amount ? balance : amount;
 
-        uint256 daoFees;
-        uint256 amountForRepayment;
-        (
-            daoFees,
-            senderTips,
-            amountForRepayment
-        ) = _calculateFees(toTransfer, user);
+        (daoFees, senderTips, amountForRepayment) = _calculateFees(toTransfer, user);
 
         require(
             IERC20(token).transferFrom(user, address(this), toTransfer),
             "transferFrom to R2R failed"
         );
+    }
+
+    /**
+     * @notice Internal function to handle RMM repayment
+     * @dev Reduces stack depth by separating RMM interaction logic
+     * @param user The user address
+     * @param token The token address
+     * @param daoFees The DAO fees amount
+     * @param senderTips The sender tips amount
+     * @param amountForRepayment The amount to be used for repayment
+     * @return actualAmountRepaid The actual amount repaid to RMM
+     * @return adjustedDaoFees The DAO fees after adjustment for any difference
+     */
+    function _handleRmmRepayment(
+        address user, 
+        address token, 
+        uint256 daoFees, 
+        uint256 senderTips,
+        uint256 amountForRepayment
+    ) 
+        internal 
+        returns (uint256 actualAmountRepaid, uint256 adjustedDaoFees) 
+    {
 
         if(tokenConfig[token].supplyToken == token) {
             uint256 withdrawnAmount = rmm.withdraw(
@@ -383,8 +427,6 @@ contract Rent2Repay is
         if(difference > 0) {
             adjustedDaoFees = daoFees > difference ? daoFees - difference : 0; 
         }
-        lastRepayTimestamps[user] = block.timestamp;
-        // no emit, transfer ERC20, track them from TheGraph
     }
 
     function rent2repay(address user, address token) 

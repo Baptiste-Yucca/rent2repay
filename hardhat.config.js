@@ -12,8 +12,8 @@ module.exports = {
       optimizer: {
         enabled: true,
         runs: 200
-      },
-      viaIR: true
+      }
+      // viaIR: true // Removed - refactored to avoid stack too deep error
     }
   },
   networks: {
