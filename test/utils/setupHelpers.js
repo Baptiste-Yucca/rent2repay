@@ -46,10 +46,8 @@ async function setupRent2Repay() {
         operator.address,    // operator - peut supprimer des utilisateurs
         await mockRMM.getAddress(),  // rmm
         await wxdaiToken.getAddress(),     // wxdaiToken
-        await wxdaiDebtToken.getAddress(), // wxdaiDebtToken
         await armmWXDAI.getAddress(),      // wxdaiArmmToken
         await usdcToken.getAddress(),      // usdcToken
-        await usdcDebtToken.getAddress(),  // usdcDebtToken
         await armmUSDC.getAddress()        // usdcArmmToken
     ], {
         initializer: 'initialize'

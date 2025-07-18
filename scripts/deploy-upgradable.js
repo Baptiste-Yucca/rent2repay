@@ -44,10 +44,8 @@ async function main() {
         operator.address,
         await mockRMM.getAddress(),
         await mockWXDAI.getAddress(),
-        await mockWXDAIDebt.getAddress(),
         await mockWXDAIArmm.getAddress(),
         await mockUSDC.getAddress(),
-        await mockUSDCDebt.getAddress(),
         await mockUSDCArmm.getAddress()
     ], {
         initializer: 'initialize'

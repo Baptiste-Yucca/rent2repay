@@ -274,7 +274,7 @@ contract Rent2Repay is
                 require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
                     "Invalid token or amount");
                 allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
-                periodicity[msg.sender][tokens[i]] = period == 1 ? 1 weeks : period;
+                periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
                 unchecked { ++i; }
             }
         // Initialize/activate user with timestamp (0 = inactive, !=0 = active)
@@ -399,16 +399,16 @@ contract Rent2Repay is
 
         // Ajust fees if there is difference
         uint256 adjustedDaoFees = daoFees;
-        
-        if(difference > 0 && tokenConfig[token].token == token) {
+        if(difference > 0 ) {
             adjustedDaoFees = daoFees > difference ? daoFees - difference : 0; 
         }
+        // Update timestamp and emit event
+        _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
 
         // Transfer fees to respective addresses
         _transferFees(token, adjustedDaoFees, senderTips);
 
-        // Update timestamp and emit event
-        _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
+        
 
         return true;
     }
@@ -436,7 +436,7 @@ contract Rent2Repay is
         uint256 actualAmountRepaid;
         uint256 difference;
         uint256 adjustedDaoFees;
-        uint256 remainingDifference;
+ 
         
         for (uint256 i = 0; i < users.length;) {
             user = users[i];
@@ -492,10 +492,10 @@ contract Rent2Repay is
                     IERC20(tokenConfig[token].token).transfer(user, difference),
                     "transfer to user failed"
                 );
-                if(tokenConfig[token].token == token) {
-                    adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
-                    totalDaoFees = totalDaoFees - daoFees + adjustedDaoFees;
-                }
+                
+                adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
+                totalDaoFees = totalDaoFees - daoFees + adjustedDaoFees;
+                
             }
 
             _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);

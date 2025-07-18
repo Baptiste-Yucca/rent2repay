@@ -130,40 +130,43 @@ async function main() {
         // ===== ÉTAPE 4: Déployer le contrat principal Rent2Repay =====
         console.log("\n📝 === ÉTAPE 4: Déploiement du contrat Rent2Repay ===");
 
+        const { upgrades } = require("hardhat");
         const Rent2RepayFactory = await ethers.getContractFactory("Rent2Repay");
-        console.log("🏠 Déploiement de Rent2Repay...");
+        console.log("🏠 Déploiement de Rent2Repay avec proxy upgradable...");
 
-        // Le constructeur attend: admin, emergency, operator, rmm, wxdaiToken, wxdaiDebtToken, wxdaiArmmToken, usdcToken, usdcDebtToken, usdcArmmToken
-        const rent2Repay = await Rent2RepayFactory.deploy(
+        // Le constructeur attend: admin, emergency, operator, rmm, wxdaiToken, wxdaiArmmToken, usdcToken, usdcArmmToken
+        const rent2Repay = await upgrades.deployProxy(Rent2RepayFactory, [
             deployer.address, // admin
             deployer.address, // emergency
             deployer.address, // operator
             rmmAddress, // rmm
             wxdaiAddress, // wxdaiToken
-            debtWXDAIAddress, // wxdaiDebtToken
             armmWXDAIAddress, // wxdaiArmmToken
             usdcAddress, // usdcToken
-            debtUSDCAddress, // usdcDebtToken
             armmUSDCAddress // usdcArmmToken
-        );
+        ], {
+            initializer: 'initialize'
+        });
         await rent2Repay.waitForDeployment();
         const rent2RepayAddress = await rent2Repay.getAddress();
         deployedAddresses.contracts.Rent2Repay = rent2RepayAddress;
         console.log("✅ Rent2Repay déployé à:", rent2RepayAddress);
-        const deployedUSDCdebtaddr = await rent2Repay.getDebtToken(usdcAddress);
-        const deployedWXDAIdebtaddr = await rent2Repay.getDebtToken(wxdaiAddress);
+
+        // Vérifier que les tokens sont bien configurés
+        const [wxdaiTokenAddr, wxdaiSupplyToken, wxdaiActive] = await rent2Repay.getTokenConfig(wxdaiAddress);
+        const [usdcTokenAddr, usdcSupplyToken, usdcActive] = await rent2Repay.getTokenConfig(usdcAddress);
 
         console.log(
-            deployedUSDCdebtaddr.toLowerCase() === debtUSDCAddress.toLowerCase()
-                ? "✅ check debtUSDC address"
-                : "❌ check debtUSDC address",
-            deployedUSDCdebtaddr
+            wxdaiActive && wxdaiTokenAddr.toLowerCase() === wxdaiAddress.toLowerCase()
+                ? "✅ check WXDAI token configuration"
+                : "❌ check WXDAI token configuration",
+            wxdaiTokenAddr
         );
         console.log(
-            deployedWXDAIdebtaddr.toLowerCase() === debtWXDAIAddress.toLowerCase()
-                ? "✅ check debtWXDAI address"
-                : "❌ check debtWXDAI address",
-            deployedWXDAIdebtaddr
+            usdcActive && usdcTokenAddr.toLowerCase() === usdcAddress.toLowerCase()
+                ? "✅ check USDC token configuration"
+                : "❌ check USDC token configuration",
+            usdcTokenAddr
         );
 
         // ===== ÉTAPE 5: Configuration initiale =====

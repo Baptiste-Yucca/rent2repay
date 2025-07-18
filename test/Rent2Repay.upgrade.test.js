@@ -61,11 +61,10 @@ describe("Rent2Repay - Upgrade Tests", function () {
         });
 
         it("Devrait initialiser les tokens autorisés", async function () {
-            const wxdaiConfig = await rent2Repay.getTokenConfig(await wxdaiToken.getAddress());
-            expect(wxdaiConfig.active).to.be.true;
-            expect(wxdaiConfig.tokenAddress).to.equal(await wxdaiToken.getAddress());
-            expect(wxdaiConfig.debtToken).to.equal(await wxdaiDebtToken.getAddress());
-            expect(wxdaiConfig.supplyToken).to.equal(await armmWXDAI.getAddress());
+            const [tokenAddress, supplyToken, active] = await rent2Repay.getTokenConfig(await wxdaiToken.getAddress());
+            expect(active).to.be.true;
+            expect(tokenAddress).to.equal(await wxdaiToken.getAddress());
+            expect(supplyToken).to.equal(await armmWXDAI.getAddress());
         });
 
         it("Ne devrait pas pouvoir initialiser deux fois", async function () {
@@ -76,10 +75,8 @@ describe("Rent2Repay - Upgrade Tests", function () {
                     operator.address,
                     await mockRMM.getAddress(),
                     await wxdaiToken.getAddress(),
-                    await wxdaiDebtToken.getAddress(),
                     await armmWXDAI.getAddress(),
                     await usdcToken.getAddress(),
-                    await usdcDebtToken.getAddress(),
                     await armmUSDC.getAddress()
                 )
             ).to.be.revertedWithCustomError(rent2Repay, "InvalidInitialization");
