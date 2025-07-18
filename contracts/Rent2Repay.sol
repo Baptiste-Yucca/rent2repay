@@ -161,31 +161,6 @@ contract Rent2Repay is
         address indexed admin
     );
 
-    /// @notice Emitted when fees are collected during repayment
-    /// @param user The user for whom the repayment was executed
-    /// @param token The token used for repayment
-    /// @param daoFees The DAO fees collected
-    /// @param senderTips The sender tips collected
-    /// @param executor The address that executed the repayment
-    event FeesCollected(
-        address indexed user,
-        address indexed token,
-        uint256 daoFees,
-        uint256 senderTips,
-        address indexed executor
-    );
-
-    /// @notice Emitted when an approval is given to an external contract
-    /// @param token The token address that was approved
-    /// @param spender The address that was approved to spend the tokens
-    /// @param amount The amount that was approved
-    /// @param admin The admin who gave the approval
-    event ApprovalGiven(
-        address indexed token,
-        address indexed spender,
-        uint256 amount,
-        address indexed admin
-    );
 
     /// @notice Custom errors for better gas efficiency
     error UserNotAuthorized();
@@ -351,13 +326,18 @@ contract Rent2Repay is
         require(_isNewPeriod(user, token), "Wait next period");
     }
 
-    function rent2repay(address user, address token) 
-        external 
-        whenNotPaused
-        validTokenAddress(token)
-        onlyAuthorizedToken(token)
-        nonReentrant
-        returns (bool) 
+    /**
+     * @notice Internal function to process a single user repayment
+     * @dev Contains the common logic for both rent2repay and batchRent2Repay
+     * @param user The user address to process repayment for
+     * @param token The token address to process
+     * @return adjustedDaoFees The DAO fees after adjustment for any difference
+     * @return senderTips The sender tips amount
+     * @return actualAmountRepaid The actual amount repaid to RMM
+     */
+    function _processUserRepayment(address user, address token) 
+        internal 
+        returns (uint256 adjustedDaoFees, uint256 senderTips, uint256 actualAmountRepaid) 
     {
         _validateUserAndToken(user, token);
    
@@ -365,12 +345,13 @@ contract Rent2Repay is
         uint256 balance = IERC20(token).balanceOf(user);
         uint256 toTransfer = balance < amount ? balance : amount;
 
+        uint256 daoFees;
+        uint256 amountForRepayment;
         (
-            uint256 daoFees,
-            uint256 senderTips,
-            uint256 amountForRepayment
+            daoFees,
+            senderTips,
+            amountForRepayment
         ) = _calculateFees(toTransfer, user);
-    
 
         require(
             IERC20(token).transferFrom(user, address(this), toTransfer),
@@ -384,17 +365,14 @@ contract Rent2Repay is
                 address(this)
             );
             require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
-            // HOWTO secure ? 
-            // withdrawnAmunt < ampour for repay
         }
         
-        uint256 actualAmountRepaid = rmm.repay(
+        actualAmountRepaid = rmm.repay(
             tokenConfig[token].token,
             amountForRepayment,
             DEFAULT_INTEREST_RATE_MODE,
             user
         );
-
 
         uint256 difference = amountForRepayment - actualAmountRepaid;
         if(difference > 0) {
@@ -404,18 +382,32 @@ contract Rent2Repay is
             );
         }
 
-        // Ajust fees if there is difference
-        uint256 adjustedDaoFees = daoFees;
-        if(difference > 0 ) {
+        // Adjust fees if there is difference
+        adjustedDaoFees = daoFees;
+        if(difference > 0) {
             adjustedDaoFees = daoFees > difference ? daoFees - difference : 0; 
         }
+
         // Update timestamp and emit event
         _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
+    }
+
+    function rent2repay(address user, address token) 
+        external 
+        whenNotPaused
+        validTokenAddress(token)
+        onlyAuthorizedToken(token)
+        nonReentrant
+        returns (bool) 
+    {
+        (
+            uint256 adjustedDaoFees,
+            uint256 senderTips,
+            
+        ) = _processUserRepayment(user, token);
 
         // Transfer fees to respective addresses
         _transferFees(token, adjustedDaoFees, senderTips);
-
-        
 
         return true;
     }
@@ -427,96 +419,31 @@ contract Rent2Repay is
         onlyAuthorizedToken(token)
         nonReentrant
     {
-        
-        uint256 totalDaoFees = 0;
-        uint256 totalSenderTips = 0;
-        
-        // Declare all variables outside the loop for gas optimization
-        address user;
-        uint256 amount;
-        uint256 balance;
-        uint256 toTransfer;
-        uint256 daoFees;
-        uint256 senderTips;
-        uint256 amountForRepayment;
-        uint256 withdrawnAmount;
-        uint256 actualAmountRepaid;
-        uint256 difference;
-        uint256 adjustedDaoFees;
- 
+        uint256 totalDaoFees =0;
+        uint256 totalSenderTips =0;
+        uint256 adjustedDaoFees =0;
+        uint256 senderTips =0;
+        address user ;
+     
         
         for (uint256 i = 0; i < users.length;) {
             user = users[i];
             require(user != address(0), "Invalid user address");
             
-            _validateUserAndToken(user, token);
-
-            amount = allowedMaxAmounts[user][token];
-            balance = IERC20(token).balanceOf(user);
-            toTransfer = balance < amount ? balance : amount;
-
             (
-                daoFees,
+                adjustedDaoFees,
                 senderTips,
-                amountForRepayment
-            ) = _calculateFees(toTransfer, user);
+                
+            ) = _processUserRepayment(user, token);
 
-            require(
-                IERC20(token).transferFrom(user, address(this), toTransfer),
-                "transferFrom failed"
-            );     
-
-            totalDaoFees += daoFees;
+            totalDaoFees += adjustedDaoFees;
             totalSenderTips += senderTips;
 
-            if(tokenConfig[token].supplyToken == token) {
-                // Check if approval is sufficient for withdraw operation
-                require(
-                    IERC20(token).allowance(address(this), address(rmm)) >= toTransfer,
-                    "Insufficient approval for token"
-                );
-                withdrawnAmount = rmm.withdraw(
-                    tokenConfig[token].token, 
-                    amountForRepayment, 
-                    address(this)
-                );
-                // see what happens on Gnossi chain
-                require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
-            }
-
-            actualAmountRepaid = rmm.repay(
-                tokenConfig[token].token,
-                amountForRepayment,
-                DEFAULT_INTEREST_RATE_MODE,
-                user
-            );
-
-            difference = amountForRepayment - actualAmountRepaid;
-            if(difference > 0) {
-                require(
-                    IERC20(tokenConfig[token].token).transfer(user, difference),
-                    "transfer to user failed"
-                );
-                
-                adjustedDaoFees = daoFees > difference ? daoFees - difference : 0;
-                totalDaoFees = totalDaoFees - daoFees + adjustedDaoFees;
-                
-            }
-
-            _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
             unchecked { ++i; }
         }
         
         if (totalDaoFees > 0 || totalSenderTips > 0) {
             _transferFees(token, totalDaoFees, totalSenderTips);
-            
-            emit FeesCollected(
-                address(0),
-                token,
-                totalDaoFees,
-                totalSenderTips,
-                msg.sender
-            );
         }
     }
 
@@ -659,7 +586,6 @@ contract Rent2Repay is
     ) 
         external 
         onlyRole(ADMIN_ROLE)
-        validTokenAddress(token)
     {
         require(spender != address(0), "Invalid spender address");
         require(amount > 0, "Amount must be greater than 0");
@@ -668,8 +594,6 @@ contract Rent2Repay is
             IERC20(token).approve(spender, amount),
             "Approval failed"
         );
-        
-        emit ApprovalGiven(token, spender, amount, msg.sender);
     }
 
     /**
@@ -933,15 +857,7 @@ contract Rent2Repay is
         return (cfg.token, cfg.supplyToken, cfg.active);
     }
 
-    /**
-     * @notice Gets the current allowance for a token towards a spender
-     * @param token The token address
-     * @param spender The spender address (e.g., RMM contract)
-     * @return Current allowance amount
-     */
-    function getAllowance(address token, address spender) external view returns (uint256) {
-        return IERC20(token).allowance(address(this), spender);
-    }
+
 
     /**
      * @notice Authorizes contract upgrades - only ADMIN_ROLE can upgrade
