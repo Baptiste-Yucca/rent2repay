@@ -48,7 +48,8 @@ async function main() {
         await mockUSDC.getAddress(),
         await mockUSDCArmm.getAddress()
     ], {
-        initializer: 'initialize'
+        initializer: 'initialize',
+        kind: 'uups'
     });
 
     console.log("Rent2Repay proxy deployed:", await rent2repay.getAddress());

@@ -145,7 +145,8 @@ async function main() {
             usdcAddress, // usdcToken
             armmUSDCAddress // usdcArmmToken
         ], {
-            initializer: 'initialize'
+            initializer: 'initialize',
+            kind: 'uups'
         });
         await rent2Repay.waitForDeployment();
         const rent2RepayAddress = await rent2Repay.getAddress();

@@ -50,7 +50,8 @@ async function setupRent2Repay() {
         await usdcToken.getAddress(),      // usdcToken
         await armmUSDC.getAddress()        // usdcArmmToken
     ], {
-        initializer: 'initialize'
+        initializer: 'initialize',
+        kind: 'uups'
     });
 
     // Configurer l'adresse DAO treasury

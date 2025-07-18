@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IRMM.sol";
 
@@ -20,7 +21,8 @@ contract Rent2Repay is
     Initializable, 
     AccessControlUpgradeable, 
     PausableUpgradeable, 
-    ReentrancyGuardUpgradeable 
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable 
 {
    
     /// @notice Role definitions
@@ -900,6 +902,17 @@ contract Rent2Repay is
         TokenConfig memory cfg = tokenConfig[token];
         return (cfg.token, cfg.supplyToken, cfg.active);
     }
+
+    /**
+     * @notice Authorizes contract upgrades - only ADMIN_ROLE can upgrade
+     * @dev Required by UUPSUpgradeable. This ensures only admins can upgrade the contract
+     * @param newImplementation Address of the new implementation contract
+     */
+    function _authorizeUpgrade(address newImplementation) 
+        internal 
+        override 
+        onlyRole(ADMIN_ROLE) 
+    {}
 
     /**
      * @notice Returns the version of the contract

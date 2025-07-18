@@ -104,9 +104,9 @@ describe("Rent2Repay - Upgrade Tests", function () {
             expect(configBefore[0]).to.equal(amount); // maxAmount
             expect(await rent2Repay.version()).to.equal("1.0.0");
 
-            // Upgrade le contrat
+            // Upgrade le contrat avec admin (UUPS nécessite ADMIN_ROLE)
             const Rent2RepayV2 = await ethers.getContractFactory("Rent2Repay");
-            const upgraded = await upgrades.upgradeProxy(proxyAddress, Rent2RepayV2);
+            const upgraded = await upgrades.upgradeProxy(proxyAddress, Rent2RepayV2.connect(admin));
 
             // Vérifier que l'adresse du proxy n'a pas changé
             expect(await upgraded.getAddress()).to.equal(proxyAddress);
@@ -127,9 +127,9 @@ describe("Rent2Repay - Upgrade Tests", function () {
             const whoAmIBefore = await rent2Repay.connect(admin).whoami();
             expect(whoAmIBefore.isAdmin).to.be.true;
 
-            // Upgrade le contrat
+            // Upgrade le contrat avec admin (UUPS nécessite ADMIN_ROLE)
             const Rent2RepayV2 = await ethers.getContractFactory("Rent2Repay");
-            const upgraded = await upgrades.upgradeProxy(proxyAddress, Rent2RepayV2);
+            const upgraded = await upgrades.upgradeProxy(proxyAddress, Rent2RepayV2.connect(admin));
 
             // Vérifier les rôles après l'upgrade
             const whoAmIAfter = await upgraded.connect(admin).whoami();
@@ -149,14 +149,34 @@ describe("Rent2Repay - Upgrade Tests", function () {
             expect(feesBefore.daoFees).to.equal(100);
             expect(feesBefore.senderTips).to.equal(50);
 
-            // Upgrade le contrat
+            // Upgrade le contrat avec admin (UUPS nécessite ADMIN_ROLE)
             const Rent2RepayV2 = await ethers.getContractFactory("Rent2Repay");
-            const upgraded = await upgrades.upgradeProxy(proxyAddress, Rent2RepayV2);
+            const upgraded = await upgrades.upgradeProxy(proxyAddress, Rent2RepayV2.connect(admin));
 
             // Vérifier que les fees ont été préservées
             const feesAfter = await upgraded.getFeeConfiguration();
             expect(feesAfter.daoFees).to.equal(100);
             expect(feesAfter.senderTips).to.equal(50);
+        });
+
+        it("Devrait permettre les upgrades seulement aux admins (UUPS)", async function () {
+            const proxyAddress = await rent2Repay.getAddress();
+            const Rent2RepayV2 = await ethers.getContractFactory("Rent2Repay");
+
+            // Essayer d'upgrade avec une adresse non-admin (emergency)
+            await expect(
+                upgrades.upgradeProxy(proxyAddress, Rent2RepayV2.connect(emergency))
+            ).to.be.reverted;
+
+            // Essayer d'upgrade avec une adresse non-admin (operator)
+            await expect(
+                upgrades.upgradeProxy(proxyAddress, Rent2RepayV2.connect(operator))
+            ).to.be.reverted;
+
+            // Upgrade avec admin devrait fonctionner
+            await expect(
+                upgrades.upgradeProxy(proxyAddress, Rent2RepayV2.connect(admin))
+            ).to.not.be.reverted;
         });
     });
 
