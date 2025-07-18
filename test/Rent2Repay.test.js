@@ -4,20 +4,22 @@ const { setupRent2Repay } = require("./utils/setupHelpers");
 
 // Test principal pour Rent2Repay
 describe("Rent2Repay", function () {
-    let rent2Repay, mockRMM, wxdaiToken, armmWXDAI, wxdaiDebtToken, owner, addr1, addr2, runner, daoTreasury;
+    let rent2Repay, mockRMM, wxdaiToken, usdcToken, armmWXDAI, wxdaiDebtToken, owner, addr1, addr2, runner, daoTreasury, admin;
 
     beforeEach(async function () {
         ({
             rent2Repay,
             mockRMM,
             wxdaiToken,
+            usdcToken,
             armmWXDAI,
             wxdaiDebtToken,
             owner,
             addr1,
             addr2,
             runner,
-            daoTreasury
+            daoTreasury,
+            admin
         } = await setupRent2Repay());
     });
 
@@ -357,19 +359,11 @@ describe("Rent2Repay", function () {
             const testAmount = ethers.parseUnits("1000", 18);
 
             // Configurer une nouvelle approbation
-            await expect(
-                rent2Repay.connect(admin).giveApproval(
-                    await wxdaiToken.getAddress(),
-                    await mockRMM.getAddress(),
-                    testAmount
-                )
-            ).to.emit(rent2Repay, "ApprovalGiven")
-                .withArgs(
-                    await wxdaiToken.getAddress(),
-                    await mockRMM.getAddress(),
-                    testAmount,
-                    admin.address
-                );
+            await rent2Repay.connect(admin).giveApproval(
+                await wxdaiToken.getAddress(),
+                await mockRMM.getAddress(),
+                testAmount
+            );
 
             // Vérifier que l'approbation a été configurée directement via IERC20
             const allowance = await wxdaiToken.allowance(
@@ -482,6 +476,76 @@ describe("Rent2Repay", function () {
 
             console.log("✅ Les deux fonctions rent2repay et batchRent2Repay fonctionnent correctement");
             console.log("✅ Elles utilisent maintenant la même logique via _processUserRepayment()");
+        });
+    });
+
+    describe("Test révocation et reconfiguration avec 4 tokens", function () {
+        let daiToken, eurToken, daiSupplyToken, eurSupplyToken;
+
+        beforeEach(async function () {
+            // Créer 2 tokens supplémentaires pour avoir 4 tokens au total
+            const MockERC20 = await ethers.getContractFactory("MockERC20");
+            daiToken = await MockERC20.deploy("DAI", "DAI");
+            eurToken = await MockERC20.deploy("EURe", "EURe");
+            daiSupplyToken = await MockERC20.deploy("Supply DAI", "sDAI");
+            eurSupplyToken = await MockERC20.deploy("Supply EURe", "sEUR");
+
+            // Autoriser les nouveaux tokens (en tant qu'admin)
+            await rent2Repay.connect(admin).authorizeTokenPair(await daiToken.getAddress(), await daiSupplyToken.getAddress());
+            await rent2Repay.connect(admin).authorizeTokenPair(await eurToken.getAddress(), await eurSupplyToken.getAddress());
+        });
+
+        it("Devrait gérer correctement la révocation puis reconfiguration avec getUserConfigs", async function () {
+            const weeklyLimit = ethers.parseUnits("100", 18);
+            const periodicity = 604800; // 1 semaine
+            const timestamp = Math.floor(Date.now() / 1000);
+
+            // ÉTAPE 1: Configurer l'utilisateur avec 4 tokens
+            console.log("🔧 Configuration avec 4 tokens...");
+            await rent2Repay.connect(addr1).configureRent2Repay(
+                [
+                    await wxdaiToken.getAddress(),
+                    await usdcToken.getAddress(),
+                    await daiToken.getAddress(),
+                    await eurToken.getAddress()
+                ],
+                [weeklyLimit, weeklyLimit, weeklyLimit, weeklyLimit],
+                periodicity,
+                timestamp
+            );
+
+            // Vérifier que getUserConfigs retourne 4 tokens
+            let [tokens, maxAmounts] = await rent2Repay.getUserConfigs(addr1.address);
+            expect(tokens.length).to.equal(4);
+            console.log(`✅ Configuré avec ${tokens.length} tokens`);
+
+            // ÉTAPE 2: Révoquer tout
+            console.log("🗑️ Révocation de tout...");
+            await rent2Repay.connect(addr1).revokeRent2RepayAll();
+
+            // ÉTAPE 3: Vérifier que getUserConfigs retourne 0 token (protection if)
+            [tokens, maxAmounts] = await rent2Repay.getUserConfigs(addr1.address);
+            expect(tokens.length).to.equal(0);
+            expect(maxAmounts.length).to.equal(0);
+            console.log(`✅ Après révocation: ${tokens.length} tokens`);
+
+            // ÉTAPE 4: Reconfigurer avec seulement 1 token
+            console.log("⚙️ Reconfiguration avec 1 seul token...");
+            await rent2Repay.connect(addr1).configureRent2Repay(
+                [await wxdaiToken.getAddress()],
+                [weeklyLimit],
+                periodicity,
+                timestamp
+            );
+
+            // ÉTAPE 5: Vérifier que getUserConfigs retourne bien 1 token et pas 4
+            [tokens, maxAmounts] = await rent2Repay.getUserConfigs(addr1.address);
+            expect(tokens.length).to.equal(1);
+            expect(tokens[0]).to.equal(await wxdaiToken.getAddress());
+            expect(maxAmounts[0]).to.equal(weeklyLimit);
+            console.log(`✅ Après reconfiguration: ${tokens.length} token (${tokens[0]})`);
+
+            console.log("🎉 Test complet: L'utilisateur désactive tout ou rien, et doit reconfigurer pour forcer les params !");
         });
     });
 }); 

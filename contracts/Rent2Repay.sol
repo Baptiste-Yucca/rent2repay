@@ -78,28 +78,10 @@ contract Rent2Repay is
     /// @notice DAO treasury address that receives DAO fees
     address public daoTreasuryAddress;
 
-    /// @notice Emitted when a user revokes their Rent2Repay authorization for a specific token
-    /// @param user The user address that revoked authorization
-    /// @param token The token address revoked
-    event Rent2RepayRevoked(address indexed user, address indexed token);
-
     /// @notice Emitted when a user revokes all their Rent2Repay authorizations
     /// @param user The user address that revoked all authorizations
     event Rent2RepayRevokedAll(address indexed user);
 
-    /// @notice Emitted when a repayment is executed
-    /// @param user The user for whom the repayment was executed
-    /// @param token The token used for repayment
-    /// @param amount The amount that was repaid
-    /// @param remainingThisWeek The remaining amount available this week for this token
-    /// @param executor The address that executed the repayment
-    event RepaymentExecuted(
-        address indexed user, 
-        address indexed token,
-        uint256 amount, 
-        uint256 remainingThisWeek,
-        address indexed executor
-    );
 
     /// @notice Emitted when a token is unauthorized
     /// @param token The token address that was unauthorized
@@ -164,9 +146,7 @@ contract Rent2Repay is
 
     /// @notice Custom errors for better gas efficiency
     error UserNotAuthorized();
-    error InvalidUserAddress();
     error InvalidTokenAddress();
-    error ContractPaused();
     error TokenNotAuthorized();
     error InvalidFeesBPS();
     error InvalidTipsBPS();
@@ -259,13 +239,29 @@ contract Rent2Repay is
     ) external whenNotPaused {
         uint256 len = tokens.length;
         require(len > 0 && len == amounts.length, "Invalid array lengths");
-            for (uint256 i = 0; i < len;) {
-                require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
-                    "Invalid token or amount");
-                allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
-                periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
-                unchecked { ++i; }
-            }
+        
+        // Validation préalable des tokens à configurer
+        for (uint256 i = 0; i < len;) {
+            require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
+                "Invalid token or amount");
+            unchecked { ++i; }
+        }
+        
+        // ÉTAPE 1: Forcer tout à 0 (L'utilisateur désactive tout ou rien)
+        uint256 maxLength = _authorizedTokensList.length;
+        for (uint256 i = 0; i < maxLength;) {
+            allowedMaxAmounts[msg.sender][_authorizedTokensList[i]] = 0;
+            periodicity[msg.sender][_authorizedTokensList[i]] = 0;
+            unchecked { ++i; }
+        }
+        
+        // ÉTAPE 2: Valoriser les tokens demandés
+        for (uint256 i = 0; i < len;) {
+            allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
+            periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
+            unchecked { ++i; }
+        }
+        
         // Initialize/activate user with timestamp (0 = inactive, !=0 = active)
         if (lastRepayTimestamps[msg.sender] == 0) {
             lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
@@ -277,7 +273,7 @@ contract Rent2Repay is
      */
     function revokeRent2RepayAll() external userIsAuthorized(msg.sender) {
         _removeUserAllTokens(msg.sender);
-        emit Rent2RepayRevokedAll(msg.sender);
+        
     }
 
     /**
@@ -387,9 +383,8 @@ contract Rent2Repay is
         if(difference > 0) {
             adjustedDaoFees = daoFees > difference ? daoFees - difference : 0; 
         }
-
-        // Update timestamp and emit event
-        _updateTimestampAndEmitEvent(user, token, actualAmountRepaid);
+        lastRepayTimestamps[user] = block.timestamp;
+        // no emit, transfer ERC20, track them from TheGraph
     }
 
     function rent2repay(address user, address token) 
@@ -596,24 +591,7 @@ contract Rent2Repay is
         );
     }
 
-    /**
-     * @notice Revokes the Rent2Repay authorization for a specific token
-     * @dev Since Rent2Repay works with single token type, this disables the entire user
-     * @param token The token address to revoke authorization for
-     */
-    function revokeRent2RepayForToken(address token) 
-        external 
-        validTokenAddress(token)
-        onlyAuthorizedToken(token)
-    {
-        require(lastRepayTimestamps[msg.sender] != 0, "User not authorized");
-        require(allowedMaxAmounts[msg.sender][token] > 0, "User not configured for this token");
-        
-        // Disable the entire user (single timestamp optimization)
-        lastRepayTimestamps[msg.sender] = 0;
-        emit Rent2RepayRevoked(msg.sender, token);
-        emit Rent2RepayRevokedAll(msg.sender);
-    }
+
 
     /**
      * @notice Internal function to remove a user from the system for all tokens
@@ -621,10 +599,11 @@ contract Rent2Repay is
      * @param user The user to remove
      */
     function _removeUserAllTokens(address user) internal {
-        // Single SSTORE operation - massive gas optimization!
-        // Note: We keep allowedMaxAmounts and periodicity values for potential reactivation
         lastRepayTimestamps[user] = 0;
+        emit Rent2RepayRevokedAll(user);
     }
+
+
 
 
     /*
@@ -822,23 +801,6 @@ contract Rent2Repay is
             require(IERC20(token).transfer(msg.sender, senderTips), "Transfer to sender failed");
         }
     }
-
-    // Helper function to update timestamps and emit events
-    function _updateTimestampAndEmitEvent(
-        address user,
-        address token,
-        uint256 actualAmountRepaid
-    ) internal {
-        lastRepayTimestamps[user] = block.timestamp;
-        emit RepaymentExecuted(
-            user, 
-            token,
-            actualAmountRepaid, 
-            allowedMaxAmounts[user][token],
-            msg.sender
-        );
-    }
-
 
 
     /**
