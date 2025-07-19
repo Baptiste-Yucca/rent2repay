@@ -56,8 +56,9 @@ contract Rent2Repay is
     /// @notice Maps token addresses to their debt token addresses
     mapping(address => TokenConfig) public tokenConfig;
 
-    /// @notice Array to keep track of authorized tokens
-    address[] public authorizedTokensList;
+    /// @notice Array to keep track of all tokens that have been configured at least once
+    /// @dev Use tokenConfig[token].active to check if a token is currently active
+    address[] public tokenList;
 
     /// @notice DAO fees in basis points (BPS) - 10000 = 100%
     uint256 public daoFeesBPS;
@@ -184,10 +185,10 @@ contract Rent2Repay is
         require(len > 0 && len == amounts.length, "Invalid array lengths");
             
         /// @dev Force to clean up data
-        uint256 maxLength = authorizedTokensList.length;
+        uint256 maxLength = tokenList.length;
         for (uint256 i = 0; i < maxLength;) {
-            allowedMaxAmounts[msg.sender][authorizedTokensList[i]] = 0;
-            periodicity[msg.sender][authorizedTokensList[i]] = 0;
+            allowedMaxAmounts[msg.sender][tokenList[i]] = 0;
+            periodicity[msg.sender][tokenList[i]] = 0;
             unchecked { ++i; }
         }
         
@@ -475,18 +476,18 @@ contract Rent2Repay is
             return (new address[](0), new uint256[](0));
         }
 
-        uint256 maxLength = authorizedTokensList.length;
+        uint256 maxLength = tokenList.length;
         tokens = new address[](maxLength);
         maxAmounts = new uint256[](maxLength);
 
         uint256 index;
         for (uint256 i = 0; i < maxLength; ) {
             if (
-                tokenConfig[authorizedTokensList[i]].active &&
-                allowedMaxAmounts[user][authorizedTokensList[i]] > 0
+                tokenConfig[tokenList[i]].active &&
+                allowedMaxAmounts[user][tokenList[i]] > 0
             ) {
-                tokens[index] = authorizedTokensList[i];
-                maxAmounts[index] = allowedMaxAmounts[user][authorizedTokensList[i]];
+                tokens[index] = tokenList[i];
+                maxAmounts[index] = allowedMaxAmounts[user][tokenList[i]];
                 unchecked { ++index; }
             }
             unchecked { ++i; }
@@ -524,7 +525,7 @@ contract Rent2Repay is
         
         tokenConfig[token] = config;
         tokenConfig[supplyToken] = config;
-        authorizedTokensList.push(token);
+        tokenList.push(token);
     }
 
     /**
@@ -538,14 +539,8 @@ contract Rent2Repay is
         tokenConfig[token].active = false;
         tokenConfig[tokenConfig[token].supplyToken].active = false;
 
-        /// @dev Remove from authorizedTokensList
-        for (uint256 i = 0; i < authorizedTokensList.length;) {
-            if (authorizedTokensList[i] == token) {
-                authorizedTokensList.pop();
-                break;
-            }
-            unchecked { ++i; }
-        }
+        /// @dev Token remains in tokenList for historical tracking
+        /// @dev Use tokenConfig[token].active to check current status
     }
 
     /**
@@ -781,18 +776,36 @@ contract Rent2Repay is
     }
 
     /**
+     * @notice Returns the total number of tokens ever configured
+     * @return count Total count of tokens in history
+     */
+    function getTokenListLength() external view returns (uint256) {
+        return tokenList.length;
+    }
+
+    /**
+     * @notice Returns a token address by index from the complete list
+     * @param index Index in the token list
+     * @return token Token address at the specified index
+     */
+    function getTokenByIndex(uint256 index) external view returns (address) {
+        require(index < tokenList.length, "Index out of bounds");
+        return tokenList[index];
+    }
+
+    /**
      * @notice Returns an array of active token addresses
      * @dev Gas-optimized function that filters out inactive tokens using assembly for resizing
      * @return activeTokens Array of currently active token addresses
      */
     function getActiveTokens() external view returns (address[] memory activeTokens) {
-        uint256 len = authorizedTokensList.length;
+        uint256 len = tokenList.length;
         /// @dev Allocate array with maximum size directly
         activeTokens = new address[](len);
 
         uint256 count;
         for (uint256 i; i < len; ) {
-            address t = authorizedTokensList[i];
+            address t = tokenList[i];
             if (tokenConfig[t].active) {
                 activeTokens[count] = t;
                 unchecked { ++count; }

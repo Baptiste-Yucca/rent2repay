@@ -219,16 +219,16 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Montant minimal correctement enregistré");
         });
 
-        it("Devrait tester getActiveTokens et authorizedTokensList", async function () {
+        it("Devrait tester getActiveTokens et tokenList", async function () {
             // ÉTAPE 1: Vérifier l'état initial - 2 tokens actifs (WXDAI et USDC)
             const initialActiveTokens = await rent2Repay.getActiveTokens();
             expect(initialActiveTokens.length).to.equal(2);
             console.log(`✅ État initial: ${initialActiveTokens.length} tokens actifs`);
 
-            // ÉTAPE 2: Vérifier que authorizedTokensList est accessible publiquement
-            const authorizedLength = await rent2Repay.authorizedTokensList(0);
-            expect(authorizedLength).to.not.be.undefined;
-            console.log("✅ authorizedTokensList accessible publiquement");
+            // ÉTAPE 2: Vérifier que tokenList est accessible publiquement
+            const tokenLength = await rent2Repay.tokenList(0);
+            expect(tokenLength).to.not.be.undefined;
+            console.log("✅ tokenList accessible publiquement");
 
             // ÉTAPE 3: Vérifier que les tokens initiaux sont WXDAI et USDC
             const wxdaiAddr = await wxdaiToken.getAddress();
