@@ -133,10 +133,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Autorisation avec non-admin : correctement revert");
 
             // ÉTAPE 3: Autoriser la paire avec une adresse admin
-            await expect(
-                rent2Repay.connect(admin).authorizeTokenPair(testToken, testSupplyToken)
-            ).to.emit(rent2Repay, "TokenPairAuthorized")
-                .withArgs(testToken, testSupplyToken);
+            await rent2Repay.connect(admin).authorizeTokenPair(testToken, testSupplyToken);
             console.log("✅ Autorisation avec admin : succès");
 
             // ÉTAPE 4: Vérifier via getTokenConfig que c'est bien inséré off-chain
@@ -160,10 +157,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Désautorisation avec non-admin : correctement revert");
 
             // ÉTAPE 7: Désautoriser le token avec admin
-            await expect(
-                rent2Repay.connect(admin).unauthorizeToken(testToken)
-            ).to.emit(rent2Repay, "TokenUnauthorized")
-                .withArgs(testToken);
+            await rent2Repay.connect(admin).unauthorizeToken(testToken);
             console.log("✅ Désautorisation avec admin : succès");
 
             // ÉTAPE 8: Vérifier que le token est désactivé
@@ -223,6 +217,51 @@ describe("Rent2Repay - Pause/Unpause", function () {
             const config = await rent2Repay.getUserConfigForToken(addr1.address, await wxdaiToken.getAddress());
             expect(config[0]).to.equal(1);
             console.log("✅ Montant minimal correctement enregistré");
+        });
+
+        it("Devrait tester getActiveTokens et authorizedTokensList", async function () {
+            // ÉTAPE 1: Vérifier l'état initial - 2 tokens actifs (WXDAI et USDC)
+            const initialActiveTokens = await rent2Repay.getActiveTokens();
+            expect(initialActiveTokens.length).to.equal(2);
+            console.log(`✅ État initial: ${initialActiveTokens.length} tokens actifs`);
+
+            // ÉTAPE 2: Vérifier que authorizedTokensList est accessible publiquement
+            const authorizedLength = await rent2Repay.authorizedTokensList(0);
+            expect(authorizedLength).to.not.be.undefined;
+            console.log("✅ authorizedTokensList accessible publiquement");
+
+            // ÉTAPE 3: Vérifier que les tokens initiaux sont WXDAI et USDC
+            const wxdaiAddr = await wxdaiToken.getAddress();
+            const usdcAddr = await usdcToken.getAddress();
+            expect(initialActiveTokens).to.include(wxdaiAddr);
+            expect(initialActiveTokens).to.include(usdcAddr);
+            console.log("✅ WXDAI et USDC présents dans les tokens actifs");
+
+            // ÉTAPE 4: Ajouter un nouveau token temporaire
+            const testToken = "0x0000000000000000000000000000000000000020";
+            const testSupplyToken = "0x0000000000000000000000000000000000000021";
+
+            await rent2Repay.connect(admin).authorizeTokenPair(testToken, testSupplyToken);
+            console.log("✅ Nouveau token temporaire ajouté");
+
+            // ÉTAPE 5: Vérifier que getActiveTokens retourne 3 tokens
+            const tokensAfterAdd = await rent2Repay.getActiveTokens();
+            expect(tokensAfterAdd.length).to.equal(3);
+            expect(tokensAfterAdd).to.include(testToken);
+            console.log(`✅ Après ajout: ${tokensAfterAdd.length} tokens actifs`);
+
+            // ÉTAPE 6: Désautoriser le token temporaire
+            await rent2Repay.connect(admin).unauthorizeToken(testToken);
+            console.log("✅ Token temporaire désautorisé");
+
+            // ÉTAPE 7: Vérifier que getActiveTokens retourne 2 tokens (filtre les inactifs)
+            const tokensAfterRemove = await rent2Repay.getActiveTokens();
+            expect(tokensAfterRemove.length).to.equal(2);
+            expect(tokensAfterRemove).to.not.include(testToken);
+            console.log(`✅ Après suppression: ${tokensAfterRemove.length} tokens actifs`);
+
+            // ÉTAPE 8: Vérifier la cost efficiency - getActiveTokens() ne retourne que les actifs
+            console.log("✅ getActiveTokens() filtre efficacement les tokens inactifs");
         });
     });
 
@@ -297,10 +336,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Mise à jour fees avec non-admin : correctement revert");
 
             // ÉTAPE 3: Mettre à jour avec admin
-            await expect(
-                rent2Repay.connect(admin).updateDaoFees(newDaoFees)
-            ).to.emit(rent2Repay, "DaoFeesUpdated")
-                .withArgs(oldFees, newDaoFees, admin.address);
+            await rent2Repay.connect(admin).updateDaoFees(newDaoFees);
             console.log("✅ Mise à jour fees avec admin : succès");
 
             // ÉTAPE 4: Vérifier la nouvelle configuration
@@ -321,10 +357,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Mise à jour tips avec non-admin : correctement revert");
 
             // ÉTAPE 2: Mettre à jour avec admin
-            await expect(
-                rent2Repay.connect(admin).updateSenderTips(newSenderTips)
-            ).to.emit(rent2Repay, "SenderTipsUpdated")
-                .withArgs(oldTips, newSenderTips, admin.address);
+            await rent2Repay.connect(admin).updateSenderTips(newSenderTips);
             console.log("✅ Mise à jour tips avec admin : succès");
 
             // ÉTAPE 3: Vérifier la nouvelle configuration
@@ -348,10 +381,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Mise à jour treasury avec non-admin : correctement revert");
 
             // ÉTAPE 3: Mettre à jour avec admin
-            await expect(
-                rent2Repay.connect(admin).updateDaoTreasuryAddress(newTreasuryAddress)
-            ).to.emit(rent2Repay, "DaoTreasuryAddressUpdated")
-                .withArgs(oldTreasuryAddress, newTreasuryAddress, admin.address);
+            await rent2Repay.connect(admin).updateDaoTreasuryAddress(newTreasuryAddress);
             console.log("✅ Mise à jour treasury avec admin : succès");
 
             // ÉTAPE 4: Vérifier la nouvelle configuration
@@ -371,10 +401,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Mise à jour token réduction avec non-admin : correctement revert");
 
             // ÉTAPE 2: Mettre à jour avec admin
-            await expect(
-                rent2Repay.connect(admin).updateDaoFeeReductionToken(reductionToken)
-            ).to.emit(rent2Repay, "DaoFeeReductionTokenUpdated")
-                .withArgs(ethers.ZeroAddress, reductionToken, admin.address);
+            await rent2Repay.connect(admin).updateDaoFeeReductionToken(reductionToken);
             console.log("✅ Mise à jour token réduction avec admin : succès");
 
             // ÉTAPE 3: Vérifier la nouvelle configuration
@@ -394,10 +421,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Mise à jour seuil avec non-admin : correctement revert");
 
             // ÉTAPE 2: Mettre à jour avec admin
-            await expect(
-                rent2Repay.connect(admin).updateDaoFeeReductionMinimumAmount(newMinAmount)
-            ).to.emit(rent2Repay, "DaoFeeReductionMinimumAmountUpdated")
-                .withArgs(0, newMinAmount, admin.address);
+            await rent2Repay.connect(admin).updateDaoFeeReductionMinimumAmount(newMinAmount);
             console.log("✅ Mise à jour seuil avec admin : succès");
 
             // ÉTAPE 3: Vérifier la nouvelle configuration
@@ -418,10 +442,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Mise à jour pourcentage avec non-admin : correctement revert");
 
             // ÉTAPE 2: Mettre à jour avec admin
-            await expect(
-                rent2Repay.connect(admin).updateDaoFeeReductionPercentage(newReductionPercentage)
-            ).to.emit(rent2Repay, "DaoFeeReductionPercentageUpdated")
-                .withArgs(oldReductionPercentage, newReductionPercentage, admin.address);
+            await rent2Repay.connect(admin).updateDaoFeeReductionPercentage(newReductionPercentage);
             console.log("✅ Mise à jour pourcentage avec admin : succès");
 
             // ÉTAPE 3: Vérifier la nouvelle configuration
@@ -672,7 +693,7 @@ describe("Rent2Repay - Pause/Unpause", function () {
             // ÉTAPE 5: Supprimer l'utilisateur avec un opérateur
             await expect(
                 rent2Repay.connect(operator).removeUser(addr1.address)
-            ).to.emit(rent2Repay, "Rent2RepayRevokedAll");
+            ).to.emit(rent2Repay, "RevokedR2R");
             console.log("✅ Suppression avec operator : succès");
 
             // ÉTAPE 6: Vérifier que l'utilisateur n'est plus autorisé

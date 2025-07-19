@@ -28,12 +28,15 @@ describe("Rent2Repay", function () {
         const periodicity = 604800; // 1 semaine
         const timestamp = Math.floor(Date.now() / 1000);
 
-        await rent2Repay.connect(addr1).configureRent2Repay(
-            [await wxdaiToken.getAddress()],
-            [weeklyLimit],
-            periodicity,
-            timestamp
-        );
+        await expect(
+            rent2Repay.connect(addr1).configureRent2Repay(
+                [await wxdaiToken.getAddress()],
+                [weeklyLimit],
+                periodicity,
+                timestamp
+            )
+        ).to.emit(rent2Repay, "ConfiguredR2R")
+            .withArgs(addr1.address);
 
         const config = await rent2Repay.getUserConfigForToken(addr1.address, await wxdaiToken.getAddress());
         expect(config[0]).to.equal(weeklyLimit);
@@ -169,7 +172,10 @@ describe("Rent2Repay", function () {
         expect(await rent2Repay.isAuthorized(addr1.address)).to.be.true;
 
         // Révoquer l'autorisation
-        await rent2Repay.connect(addr1).revokeRent2RepayAll();
+        await expect(
+            rent2Repay.connect(addr1).revokeRent2RepayAll()
+        ).to.emit(rent2Repay, "RevokedR2R")
+            .withArgs(addr1.address);
 
         // Vérifier que l'utilisateur n'est plus autorisé
         expect(await rent2Repay.isAuthorized(addr1.address)).to.be.false;

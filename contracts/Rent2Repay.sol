@@ -57,7 +57,7 @@ contract Rent2Repay is
     mapping(address => TokenConfig) public tokenConfig;
 
     /// @notice Array to keep track of authorized tokens
-    address[] private _authorizedTokensList;
+    address[] public authorizedTokensList;
 
     /// @notice DAO fees in basis points (BPS) - 10000 = 100%
     uint256 public daoFeesBPS;
@@ -80,68 +80,11 @@ contract Rent2Repay is
 
     /// @notice Emitted when a user revokes all their Rent2Repay authorizations
     /// @param user The user address that revoked all authorizations
-    event Rent2RepayRevokedAll(address indexed user);
+    event RevokedR2R (address indexed user);
 
-
-    /// @notice Emitted when a token is unauthorized
-    /// @param token The token address that was unauthorized
-    event TokenUnauthorized(address indexed token);
-
-    /// @notice Emitted when a token pair is authorized
-    /// @param token The token address that was authorized
-    /// @param supplyToken The supply token address associated with the token
-    event TokenPairAuthorized(
-        address indexed token, 
-        address indexed supplyToken
-    );
-
-    /// @notice Emitted when DAO fees are updated
-    /// @param oldFees The previous DAO fees in BPS
-    /// @param newFees The new DAO fees in BPS
-    /// @param admin The admin who updated the fees
-    event DaoFeesUpdated(uint256 oldFees, uint256 newFees, address indexed admin);
-
-    /// @notice Emitted when sender tips are updated
-    /// @param oldTips The previous sender tips in BPS
-    /// @param newTips The new sender tips in BPS
-    /// @param admin The admin who updated the tips
-    event SenderTipsUpdated(uint256 oldTips, uint256 newTips, address indexed admin);
-
-    /// @notice Emitted when DAO fee reduction token is updated
-    /// @param oldToken The previous DAO fee reduction token address
-    /// @param newToken The new DAO fee reduction token address
-    /// @param admin The admin who updated the token
-    event DaoFeeReductionTokenUpdated(address oldToken, address newToken, address indexed admin);
-
-    /// @notice Emitted when DAO fee reduction minimum amount is updated
-    /// @param oldAmount The previous minimum amount
-    /// @param newAmount The new minimum amount
-    /// @param admin The admin who updated the amount
-    event DaoFeeReductionMinimumAmountUpdated(
-        uint256 oldAmount, 
-        uint256 newAmount, 
-        address indexed admin
-    );
-
-    /// @notice Emitted when DAO fee reduction percentage is updated
-    /// @param oldPercentage The previous reduction percentage in BPS
-    /// @param newPercentage The new reduction percentage in BPS
-    /// @param admin The admin who updated the percentage
-    event DaoFeeReductionPercentageUpdated(
-        uint256 oldPercentage, 
-        uint256 newPercentage, 
-        address indexed admin
-    );
-
-    /// @notice Emitted when DAO treasury address is updated
-    /// @param oldAddress The previous DAO treasury address
-    /// @param newAddress The new DAO treasury address
-    /// @param admin The admin who updated the address
-    event DaoTreasuryAddressUpdated(
-        address oldAddress, 
-        address newAddress, 
-        address indexed admin
-    );
+    /// @notice Emitted when a user configure all their Rent2Repay authorizations
+    /// @param user The user address that revoked all authorizations
+    event ConfiguredR2R (address indexed user);
 
 
     /// @notice Custom errors for better gas efficiency
@@ -239,24 +182,19 @@ contract Rent2Repay is
     ) external whenNotPaused {
         uint256 len = tokens.length;
         require(len > 0 && len == amounts.length, "Invalid array lengths");
+            
+        // force to clean up data
+        uint256 maxLength = authorizedTokensList.length;
+        for (uint256 i = 0; i < maxLength;) {
+            allowedMaxAmounts[msg.sender][authorizedTokensList[i]] = 0;
+            periodicity[msg.sender][authorizedTokensList[i]] = 0;
+            unchecked { ++i; }
+        }
         
-        // Validation préalable des tokens à configurer
+        // valorize values
         for (uint256 i = 0; i < len;) {
             require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
                 "Invalid token or amount");
-            unchecked { ++i; }
-        }
-        
-        // ÉTAPE 1: Forcer tout à 0 (L'utilisateur désactive tout ou rien)
-        uint256 maxLength = _authorizedTokensList.length;
-        for (uint256 i = 0; i < maxLength;) {
-            allowedMaxAmounts[msg.sender][_authorizedTokensList[i]] = 0;
-            periodicity[msg.sender][_authorizedTokensList[i]] = 0;
-            unchecked { ++i; }
-        }
-        
-        // ÉTAPE 2: Valoriser les tokens demandés
-        for (uint256 i = 0; i < len;) {
             allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
             periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
             unchecked { ++i; }
@@ -266,6 +204,7 @@ contract Rent2Repay is
         if (lastRepayTimestamps[msg.sender] == 0) {
             lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
         }
+        emit ConfiguredR2R(msg.sender);
     }
 
     /**
@@ -287,7 +226,7 @@ contract Rent2Repay is
         userIsAuthorized(user) 
     {
         _removeUserAllTokens(user);
-        emit Rent2RepayRevokedAll(user);
+        emit RevokedR2R(user);
     }
 
     /**
@@ -344,7 +283,7 @@ contract Rent2Repay is
         
         // Étape 2: Effectuer le remboursement via RMM et ajuster les fees
         (actualAmountRepaid, adjustedDaoFees) = _handleRmmRepayment(
-            user, token, daoFees, senderTips, amountForRepayment
+            user, token, daoFees, amountForRepayment
         );
         
         lastRepayTimestamps[user] = block.timestamp;
@@ -382,7 +321,6 @@ contract Rent2Repay is
      * @param user The user address
      * @param token The token address
      * @param daoFees The DAO fees amount
-     * @param senderTips The sender tips amount
      * @param amountForRepayment The amount to be used for repayment
      * @return actualAmountRepaid The actual amount repaid to RMM
      * @return adjustedDaoFees The DAO fees after adjustment for any difference
@@ -390,8 +328,7 @@ contract Rent2Repay is
     function _handleRmmRepayment(
         address user, 
         address token, 
-        uint256 daoFees, 
-        uint256 senderTips,
+        uint256 daoFees,
         uint256 amountForRepayment
     ) 
         internal 
@@ -399,12 +336,15 @@ contract Rent2Repay is
     {
 
         if(tokenConfig[token].supplyToken == token) {
-            uint256 withdrawnAmount = rmm.withdraw(
-                tokenConfig[token].token, 
-                amountForRepayment, 
-                address(this)
+            // note if fail, revert all
+            require(
+                rmm.withdraw(
+                    tokenConfig[token].token, 
+                    amountForRepayment, 
+                    address(this)
+                ) == amountForRepayment, 
+                "Withdrawn amount mismatch"
             );
-            require(withdrawnAmount == amountForRepayment, "Withdrawn amount mismatch");
         }
         
         actualAmountRepaid = rmm.repay(
@@ -435,7 +375,6 @@ contract Rent2Repay is
         validTokenAddress(token)
         onlyAuthorizedToken(token)
         nonReentrant
-        returns (bool) 
     {
         (
             uint256 adjustedDaoFees,
@@ -445,8 +384,6 @@ contract Rent2Repay is
 
         // Transfer fees to respective addresses
         _transferFees(token, adjustedDaoFees, senderTips);
-
-        return true;
     }
 
     function batchRent2Repay(address[] calldata users, address token) 
@@ -534,18 +471,18 @@ contract Rent2Repay is
             return (new address[](0), new uint256[](0));
         }
 
-        uint256 maxLength = _authorizedTokensList.length;
+        uint256 maxLength = authorizedTokensList.length;
         tokens = new address[](maxLength);
         maxAmounts = new uint256[](maxLength);
 
         uint256 index;
         for (uint256 i = 0; i < maxLength; ) {
             if (
-                tokenConfig[_authorizedTokensList[i]].active &&
-                allowedMaxAmounts[user][_authorizedTokensList[i]] > 0
+                tokenConfig[authorizedTokensList[i]].active &&
+                allowedMaxAmounts[user][authorizedTokensList[i]] > 0
             ) {
-                tokens[index] = _authorizedTokensList[i];
-                maxAmounts[index] = allowedMaxAmounts[user][_authorizedTokensList[i]];
+                tokens[index] = authorizedTokensList[i];
+                maxAmounts[index] = allowedMaxAmounts[user][authorizedTokensList[i]];
                 unchecked { ++index; }
             }
             unchecked { ++i; }
@@ -583,8 +520,7 @@ contract Rent2Repay is
         
         tokenConfig[token] = config;
         tokenConfig[supplyToken] = config;
-        _authorizedTokensList.push(token);
-        emit TokenPairAuthorized(token, supplyToken);
+        authorizedTokensList.push(token);
     }
 
     /**
@@ -599,14 +535,13 @@ contract Rent2Repay is
         tokenConfig[tokenConfig[token].supplyToken].active = false;
 
         // Remove from authorizedTokensList
-        for (uint256 i = 0; i < _authorizedTokensList.length;) {
-            if (_authorizedTokensList[i] == token) {
-                _authorizedTokensList.pop();
+        for (uint256 i = 0; i < authorizedTokensList.length;) {
+            if (authorizedTokensList[i] == token) {
+                authorizedTokensList.pop();
                 break;
             }
             unchecked { ++i; }
         }
-        emit TokenUnauthorized(token);
     }
 
     /**
@@ -633,8 +568,6 @@ contract Rent2Repay is
         );
     }
 
-
-
     /**
      * @notice Internal function to remove a user from the system for all tokens
      * @dev Optimized: Only disable user globally via timestamp (massive gas savings)
@@ -642,11 +575,8 @@ contract Rent2Repay is
      */
     function _removeUserAllTokens(address user) internal {
         lastRepayTimestamps[user] = 0;
-        emit Rent2RepayRevokedAll(user);
+        emit RevokedR2R(user);
     }
-
-
-
 
     /*
      * @notice Internal function to check if a new week has started
@@ -714,11 +644,7 @@ contract Rent2Repay is
         onlyRole(ADMIN_ROLE) 
     {
         if (newFeesBPS + senderTipsBPS > 10000) revert InvalidFeesBPS();
-        
-        uint256 oldFees = daoFeesBPS;
         daoFeesBPS = newFeesBPS;
-        
-        emit DaoFeesUpdated(oldFees, newFeesBPS, msg.sender);
     }
 
     /**
@@ -730,11 +656,7 @@ contract Rent2Repay is
         onlyRole(ADMIN_ROLE) 
     {
         if (daoFeesBPS + newTipsBPS > 10000) revert InvalidTipsBPS();
-        
-        uint256 oldTips = senderTipsBPS;
         senderTipsBPS = newTipsBPS;
-        
-        emit SenderTipsUpdated(oldTips, newTipsBPS, msg.sender);
     }
 
     /**
@@ -784,22 +706,18 @@ contract Rent2Repay is
         onlyRole(ADMIN_ROLE) 
         validTokenAddress(newToken)
     {
-        address oldToken = daoFeeReductionToken;
         daoFeeReductionToken = newToken;
-        emit DaoFeeReductionTokenUpdated(oldToken, newToken, msg.sender);
     }
 
     /**
      * @notice Allows admin to update DAO fee reduction minimum amount
-     * @param newAmount The new minimum amount
+     * @param newMinimumAmount The new minimum amount required for fee reduction
      */
-    function updateDaoFeeReductionMinimumAmount(uint256 newAmount) 
+    function updateDaoFeeReductionMinimumAmount(uint256 newMinimumAmount) 
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        uint256 oldAmount = daoFeeReductionMinimumAmount;
-        daoFeeReductionMinimumAmount = newAmount;
-        emit DaoFeeReductionMinimumAmountUpdated(oldAmount, newAmount, msg.sender);
+        daoFeeReductionMinimumAmount = newMinimumAmount;
     }
 
     /**
@@ -810,9 +728,7 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        uint256 oldPercentage = daoFeeReductionBPS;
         daoFeeReductionBPS = newPercentage;
-        emit DaoFeeReductionPercentageUpdated(oldPercentage, newPercentage, msg.sender);
     }
 
     /**
@@ -823,9 +739,7 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        address oldAddress = daoTreasuryAddress;
         daoTreasuryAddress = newAddress;
-        emit DaoTreasuryAddressUpdated(oldAddress, newAddress, msg.sender);
     }
 
     /**
@@ -861,7 +775,31 @@ contract Rent2Repay is
         return (cfg.token, cfg.supplyToken, cfg.active);
     }
 
+    /**
+     * @notice Returns an array of active token addresses
+     * @dev Cost-efficient function that filters out inactive tokens
+     * @return activeTokens Array of currently active token addresses
+     */
+    function getActiveTokens() external view returns (address[] memory activeTokens) {
+        uint256 length = authorizedTokensList.length;
+        address[] memory tempTokens = new address[](length);
+        uint256 activeCount = 0;
 
+        for (uint256 i = 0; i < length;) {
+            if (tokenConfig[authorizedTokensList[i]].active) {
+                tempTokens[activeCount] = authorizedTokensList[i];
+                unchecked { ++activeCount; }
+            }
+            unchecked { ++i; }
+        }
+
+        // Resize array to exact size
+        activeTokens = new address[](activeCount);
+        for (uint256 i = 0; i < activeCount;) {
+            activeTokens[i] = tempTokens[i];
+            unchecked { ++i; }
+        }
+    }
 
     /**
      * @notice Authorizes contract upgrades - only ADMIN_ROLE can upgrade
