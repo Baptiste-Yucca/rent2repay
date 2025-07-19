@@ -51,7 +51,7 @@ contract Rent2Repay is
     /// @notice Maps user addresses to token addresses to their periodicity
     mapping(address => mapping(address => uint256)) public periodicity;
 
-    // Note: authorizedTokens mapping removed - now using tokenConfig[token].active
+    /// @dev Note: authorizedTokens mapping removed - now using tokenConfig[token].active
     
     /// @notice Maps token addresses to their debt token addresses
     mapping(address => TokenConfig) public tokenConfig;
@@ -132,12 +132,12 @@ contract Rent2Repay is
         
         rmm = IRMM(_rmm);
         
-        // Initialize default fee values
-        daoFeesBPS = 50; // 0.5% default
-        senderTipsBPS = 25; // 0.25% default
-        daoFeeReductionBPS = 5000; // 50% default
+        /// @dev Initialize default fee values
+        daoFeesBPS = 50; /// @dev 0.5% default
+        senderTipsBPS = 25; /// @dev 0.25% default
+        daoFeeReductionBPS = 5000; /// @dev 50% default
         
-        // Initialize with WXDAI and USDC as authorized token pairs
+        /// @dev Initialize with WXDAI and USDC as authorized token pairs
         _authorizeTokenPair(wxdaiToken, wxdaiArmmToken);
         _authorizeTokenPair(usdcToken, usdcArmmToken);
     }
@@ -183,7 +183,7 @@ contract Rent2Repay is
         uint256 len = tokens.length;
         require(len > 0 && len == amounts.length, "Invalid array lengths");
             
-        // force to clean up data
+        /// @dev Force to clean up data
         uint256 maxLength = authorizedTokensList.length;
         for (uint256 i = 0; i < maxLength;) {
             allowedMaxAmounts[msg.sender][authorizedTokensList[i]] = 0;
@@ -191,7 +191,7 @@ contract Rent2Repay is
             unchecked { ++i; }
         }
         
-        // valorize values
+        /// @dev Valorize values
         for (uint256 i = 0; i < len;) {
             require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
                 "Invalid token or amount");
@@ -200,7 +200,7 @@ contract Rent2Repay is
             unchecked { ++i; }
         }
         
-        // Initialize/activate user with timestamp (0 = inactive, !=0 = active)
+        /// @dev Initialize/activate user with timestamp (0 = inactive, !=0 = active)
         if (lastRepayTimestamps[msg.sender] == 0) {
             lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
         }
@@ -253,7 +253,12 @@ contract Rent2Repay is
     }
     
 
-    // Helper function to perform security checks and configuration validation
+    /**
+     * @notice Helper function to perform security checks and configuration validation
+     * @dev Validates user authorization and token configuration
+     * @param user The user address to validate
+     * @param token The token address to validate
+     */
     function _validateUserAndToken(address user, address token) internal view {
         require(lastRepayTimestamps[user] != 0, "User not authorized");
         require(allowedMaxAmounts[user][token] > 0, "User not configured for token");
@@ -276,18 +281,18 @@ contract Rent2Repay is
     {
         _validateUserAndToken(user, token);
         
-        // Étape 1: Calculer et transférer les tokens
+        /// @dev Step 1: Calculate and transfer tokens
         uint256 daoFees;
         uint256 amountForRepayment;
         (daoFees, senderTips, amountForRepayment) = _handleTokenTransferAndFees(user, token);
         
-        // Étape 2: Effectuer le remboursement via RMM et ajuster les fees
+        /// @dev Step 2: Perform RMM repayment and adjust fees
         (actualAmountRepaid, adjustedDaoFees) = _handleRmmRepayment(
             user, token, daoFees, amountForRepayment
         );
         
         lastRepayTimestamps[user] = block.timestamp;
-        // no emit, transfer ERC20, track them from TheGraph
+        /// @dev No emit, transfer ERC20, track them from TheGraph
     }
 
     /**
@@ -336,7 +341,7 @@ contract Rent2Repay is
     {
 
         if(tokenConfig[token].supplyToken == token) {
-            // note if fail, revert all
+            /// @dev Note: if fail, revert all
             require(
                 rmm.withdraw(
                     tokenConfig[token].token, 
@@ -362,7 +367,7 @@ contract Rent2Repay is
             );
         }
 
-        // Adjust fees if there is difference
+        /// @dev Adjust fees if there is difference
         adjustedDaoFees = daoFees;
         if(difference > 0) {
             adjustedDaoFees = daoFees > difference ? daoFees - difference : 0; 
@@ -382,7 +387,7 @@ contract Rent2Repay is
             
         ) = _processUserRepayment(user, token);
 
-        // Transfer fees to respective addresses
+        /// @dev Transfer fees to respective addresses
         _transferFees(token, adjustedDaoFees, senderTips);
     }
 
@@ -466,7 +471,7 @@ contract Rent2Repay is
             uint256[] memory maxAmounts
         )
     {
-        // If user is not authorized, return empty arrays
+        /// @dev If user is not authorized, return empty arrays
         if (lastRepayTimestamps[user] == 0) {
             return (new address[](0), new uint256[](0));
         }
@@ -534,7 +539,7 @@ contract Rent2Repay is
         tokenConfig[token].active = false;
         tokenConfig[tokenConfig[token].supplyToken].active = false;
 
-        // Remove from authorizedTokensList
+        /// @dev Remove from authorizedTokensList
         for (uint256 i = 0; i < authorizedTokensList.length;) {
             if (authorizedTokensList[i] == token) {
                 authorizedTokensList.pop();
@@ -578,9 +583,10 @@ contract Rent2Repay is
         emit RevokedR2R(user);
     }
 
-    /*
+    /**
      * @notice Internal function to check if a new week has started
-     * @param lastTimestamp The last recorded timestamp
+     * @param _user The user address
+     * @param _token The token address
      * @return true if more than a week has passed since lastTimestamp
      */
     function _isNewPeriod(address _user, address _token) internal view returns (bool) {
@@ -600,14 +606,14 @@ contract Rent2Repay is
         uint256 senderTips,
         uint256 amountForRepayment
     ) {
-        // Calculate base fees
+        /// @dev Calculate base fees
         daoFees = (amount * daoFeesBPS) / 10000;
         senderTips = (amount * senderTipsBPS) / 10000;
 
         if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
             uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
             if (userBalance >= daoFeeReductionMinimumAmount) {
-                // Reduce DAO fees by the configured percentage (BPS)
+                /// @dev Reduce DAO fees by the configured percentage (BPS)
                 uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
                 daoFees = daoFees - reductionAmount;
             }
@@ -777,27 +783,27 @@ contract Rent2Repay is
 
     /**
      * @notice Returns an array of active token addresses
-     * @dev Cost-efficient function that filters out inactive tokens
+     * @dev Gas-optimized function that filters out inactive tokens using assembly for resizing
      * @return activeTokens Array of currently active token addresses
      */
     function getActiveTokens() external view returns (address[] memory activeTokens) {
-        uint256 length = authorizedTokensList.length;
-        address[] memory tempTokens = new address[](length);
-        uint256 activeCount = 0;
+        uint256 len = authorizedTokensList.length;
+        /// @dev Allocate array with maximum size directly
+        activeTokens = new address[](len);
 
-        for (uint256 i = 0; i < length;) {
-            if (tokenConfig[authorizedTokensList[i]].active) {
-                tempTokens[activeCount] = authorizedTokensList[i];
-                unchecked { ++activeCount; }
+        uint256 count;
+        for (uint256 i; i < len; ) {
+            address t = authorizedTokensList[i];
+            if (tokenConfig[t].active) {
+                activeTokens[count] = t;
+                unchecked { ++count; }
             }
             unchecked { ++i; }
         }
 
-        // Resize array to exact size
-        activeTokens = new address[](activeCount);
-        for (uint256 i = 0; i < activeCount;) {
-            activeTokens[i] = tempTokens[i];
-            unchecked { ++i; }
+        // Shrink array by writing count as new length using assembly
+        assembly { 
+            mstore(activeTokens, count) 
         }
     }
 
