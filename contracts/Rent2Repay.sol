@@ -201,9 +201,8 @@ contract Rent2Repay is
         }
         
         /// @dev Initialize/activate user with timestamp (0 = inactive, !=0 = active)
-        if (lastRepayTimestamps[msg.sender] == 0) {
-            lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
-        }
+        lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
+        
         emit ConfiguredR2R(msg.sender);
     }
 
