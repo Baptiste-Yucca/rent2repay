@@ -75,15 +75,15 @@ async function main() {
     let tokenConfig;
     let debtToken;
     try {
-        const [tokenAddress, debtTokenAddress, supplyTokenAddress, active] = await rent2Repay.getTokenConfig(await token.getAddress());
-        if (debtTokenAddress === ethers.ZeroAddress) {
+        const tokenConfigData = await rent2Repay.tokenConfig(await token.getAddress());
+        if (tokenConfigData.token === ethers.ZeroAddress) {
             throw new Error("Token not configured in new system");
         }
         tokenConfig = {
-            token: tokenAddress,
-            debtToken: debtTokenAddress,
-            supplyToken: supplyTokenAddress,
-            active: active
+            token: tokenConfigData.token,
+            debtToken: tokenConfigData.token, // debtToken is same as token in this case
+            supplyToken: tokenConfigData.supplyToken,
+            active: tokenConfigData.active
         };
         debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
     } catch (error) {
@@ -198,11 +198,13 @@ async function main() {
         const userAddress = signers[userConfig.index].address;
         userAddresses.push(userAddress);
 
-        const onchainConfig = await rent2Repay.getUserConfigForToken(userAddress, await token.getAddress());
+        const maxAmount = await rent2Repay.allowedMaxAmounts(userAddress, await token.getAddress());
+        const userPeriodicity = await rent2Repay.periodicity(userAddress, await token.getAddress());
+        const lastTimestamp = await rent2Repay.lastRepayTimestamps(userAddress);
         console.log(`   👤 ${userConfig.name}:`);
-        console.log(`      📅 Montant configuré: ${ethers.formatUnits(onchainConfig[0], SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${onchainConfig[0]} Wei)`);
-        console.log(`      ⏰ Périodicité: ${onchainConfig[1]}s`);
-        console.log(`      🕐 Dernier timestamp: ${onchainConfig[2]}`);
+        console.log(`      📅 Montant configuré: ${ethers.formatUnits(maxAmount, SELECTED_TOKEN.decimals)} ${SELECTED_TOKEN.name} (${maxAmount} Wei)`);
+        console.log(`      ⏰ Périodicité: ${userPeriodicity}s`);
+        console.log(`      🕐 Dernier timestamp: ${lastTimestamp}`);
     }
 
     // === ÉTAPE 5: État AVANT remboursement ===
@@ -223,7 +225,7 @@ async function main() {
             name: userConfig.name,
             tokenBalance: await token.balanceOf(userAddress),
             debtBalance: await debtToken.balanceOf(userAddress),
-            configuredAmount: (await rent2Repay.getUserConfigForToken(userAddress, await token.getAddress()))[0]
+            configuredAmount: await rent2Repay.allowedMaxAmounts(userAddress, await token.getAddress())
         };
 
         beforeState.users.push(userState);

@@ -122,8 +122,8 @@ describe("Rent2Repay - Pause/Unpause", function () {
             const testSupplyToken = "0x0000000000000000000000000000000000000012";
 
             // ÉTAPE 1: Vérifier que le token n'est pas encore configuré
-            const [tokenAddr1, supplyToken1, active1] = await rent2Repay.getTokenConfig(testToken);
-            expect(active1).to.be.false;
+            const tokenConfig1 = await rent2Repay.tokenConfig(testToken);
+            expect(tokenConfig1.active).to.be.false;
             console.log("✅ Token initial non-configuré");
 
             // ÉTAPE 2: Essayer d'autoriser avec une adresse non-admin (addr1)
@@ -136,19 +136,19 @@ describe("Rent2Repay - Pause/Unpause", function () {
             await rent2Repay.connect(admin).authorizeTokenPair(testToken, testSupplyToken);
             console.log("✅ Autorisation avec admin : succès");
 
-            // ÉTAPE 4: Vérifier via getTokenConfig que c'est bien inséré off-chain
-            const [tokenAddr2, supplyToken2, active2] = await rent2Repay.getTokenConfig(testToken);
-            expect(tokenAddr2).to.equal(testToken);
-            expect(supplyToken2).to.equal(testSupplyToken);
-            expect(active2).to.be.true;
-            console.log("✅ getTokenConfig retourne les bonnes valeurs pour le token principal");
+            // ÉTAPE 4: Vérifier via tokenConfig que c'est bien inséré off-chain
+            const tokenConfig2 = await rent2Repay.tokenConfig(testToken);
+            expect(tokenConfig2.token).to.equal(testToken);
+            expect(tokenConfig2.supplyToken).to.equal(testSupplyToken);
+            expect(tokenConfig2.active).to.be.true;
+            console.log("✅ tokenConfig retourne les bonnes valeurs pour le token principal");
 
             // ÉTAPE 5: Vérifier aussi pour le supply token
-            const [tokenAddr3, supplyToken3, active3] = await rent2Repay.getTokenConfig(testSupplyToken);
-            expect(tokenAddr3).to.equal(testToken);
-            expect(supplyToken3).to.equal(testSupplyToken);
-            expect(active3).to.be.true;
-            console.log("✅ getTokenConfig retourne les bonnes valeurs pour le supply token");
+            const tokenConfig3 = await rent2Repay.tokenConfig(testSupplyToken);
+            expect(tokenConfig3.token).to.equal(testToken);
+            expect(tokenConfig3.supplyToken).to.equal(testSupplyToken);
+            expect(tokenConfig3.active).to.be.true;
+            console.log("✅ tokenConfig retourne les bonnes valeurs pour le supply token");
 
             // ÉTAPE 6: Essayer de désautoriser avec une adresse non-admin
             await expect(
@@ -161,15 +161,15 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Désautorisation avec admin : succès");
 
             // ÉTAPE 8: Vérifier que le token est désactivé
-            const [tokenAddr4, supplyToken4, active4] = await rent2Repay.getTokenConfig(testToken);
-            expect(tokenAddr4).to.equal(testToken); // L'adresse reste
-            expect(supplyToken4).to.equal(testSupplyToken); // L'adresse reste
-            expect(active4).to.be.false; // Mais inactive
+            const tokenConfig4 = await rent2Repay.tokenConfig(testToken);
+            expect(tokenConfig4.token).to.equal(testToken); // L'adresse reste
+            expect(tokenConfig4.supplyToken).to.equal(testSupplyToken); // L'adresse reste
+            expect(tokenConfig4.active).to.be.false; // Mais inactive
             console.log("✅ Token désactivé : active = false");
 
             // ÉTAPE 9: Vérifier que le supply token est aussi désactivé
-            const [tokenAddr5, supplyToken5, active5] = await rent2Repay.getTokenConfig(testSupplyToken);
-            expect(active5).to.be.false;
+            const tokenConfig5 = await rent2Repay.tokenConfig(testSupplyToken);
+            expect(tokenConfig5.active).to.be.false;
             console.log("✅ Supply token aussi désactivé : active = false");
         });
 
@@ -214,8 +214,8 @@ describe("Rent2Repay - Pause/Unpause", function () {
             console.log("✅ Configuration avec montant 1 : acceptée");
 
             // Vérifier que la configuration a bien été enregistrée
-            const config = await rent2Repay.getUserConfigForToken(addr1.address, await wxdaiToken.getAddress());
-            expect(config[0]).to.equal(1);
+            const maxAmount = await rent2Repay.allowedMaxAmounts(addr1.address, await wxdaiToken.getAddress());
+            expect(maxAmount).to.equal(1);
             console.log("✅ Montant minimal correctement enregistré");
         });
 

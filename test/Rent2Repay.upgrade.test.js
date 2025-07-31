@@ -61,10 +61,10 @@ describe("Rent2Repay - Upgrade Tests", function () {
         });
 
         it("Devrait initialiser les tokens autorisés", async function () {
-            const [tokenAddress, supplyToken, active] = await rent2Repay.getTokenConfig(await wxdaiToken.getAddress());
-            expect(active).to.be.true;
-            expect(tokenAddress).to.equal(await wxdaiToken.getAddress());
-            expect(supplyToken).to.equal(await armmWXDAI.getAddress());
+            const tokenConfig = await rent2Repay.tokenConfig(await wxdaiToken.getAddress());
+            expect(tokenConfig.active).to.be.true;
+            expect(tokenConfig.token).to.equal(await wxdaiToken.getAddress());
+            expect(tokenConfig.supplyToken).to.equal(await armmWXDAI.getAddress());
         });
 
         it("Ne devrait pas pouvoir initialiser deux fois", async function () {
@@ -100,8 +100,8 @@ describe("Rent2Repay - Upgrade Tests", function () {
             );
 
             // Vérifier l'état avant l'upgrade
-            const configBefore = await rent2Repay.getUserConfigForToken(addr1.address, await wxdaiToken.getAddress());
-            expect(configBefore[0]).to.equal(amount); // maxAmount
+            const maxAmountBefore = await rent2Repay.allowedMaxAmounts(addr1.address, await wxdaiToken.getAddress());
+            expect(maxAmountBefore).to.equal(amount); // maxAmount
             expect(await rent2Repay.version()).to.equal("1.0.0");
 
             // Upgrade le contrat avec admin (UUPS nécessite ADMIN_ROLE)
@@ -112,8 +112,8 @@ describe("Rent2Repay - Upgrade Tests", function () {
             expect(await upgraded.getAddress()).to.equal(proxyAddress);
 
             // Vérifier que l'état a été préservé
-            const configAfter = await upgraded.getUserConfigForToken(addr1.address, await wxdaiToken.getAddress());
-            expect(configAfter[0]).to.equal(amount); // maxAmount should be preserved
+            const maxAmountAfter = await upgraded.allowedMaxAmounts(addr1.address, await wxdaiToken.getAddress());
+            expect(maxAmountAfter).to.equal(amount); // maxAmount should be preserved
 
             // Vérifier que les fonctions fonctionnent toujours
             expect(await upgraded.version()).to.equal("1.0.0");

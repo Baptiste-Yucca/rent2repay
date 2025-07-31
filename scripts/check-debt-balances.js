@@ -53,15 +53,15 @@ async function main() {
     let tokenConfig;
     let debtToken;
     try {
-        const [tokenAddress, debtTokenAddress, supplyTokenAddress, active] = await rent2Repay.getTokenConfig(await token.getAddress());
-        if (debtTokenAddress === ethers.ZeroAddress) {
+        const tokenConfigData = await rent2Repay.tokenConfig(await token.getAddress());
+        if (tokenConfigData.token === ethers.ZeroAddress) {
             throw new Error("Token not configured in new system");
         }
         tokenConfig = {
-            token: tokenAddress,
-            debtToken: debtTokenAddress,
-            supplyToken: supplyTokenAddress,
-            active: active
+            token: tokenConfigData.token,
+            debtToken: tokenConfigData.token, // debtToken is same as token in this case
+            supplyToken: tokenConfigData.supplyToken,
+            active: tokenConfigData.active
         };
         debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
     } catch (error) {
@@ -166,7 +166,7 @@ async function main() {
         userDebtBalance: await debtToken.balanceOf(userAddress),
         runnerTokenBalance: await token.balanceOf(runnerAddress),
         daoTreasuryBalance: await token.balanceOf(daoConfig.treasuryAddress),
-        userConfiguredAmount: (await rent2Repay.getUserConfigForToken(userAddress, await token.getAddress()))[0]
+        userConfiguredAmount: await rent2Repay.allowedMaxAmounts(userAddress, await token.getAddress())
     };
 
     console.log("   État initial :");

@@ -154,20 +154,20 @@ async function main() {
         console.log("✅ Rent2Repay déployé à:", rent2RepayAddress);
 
         // Vérifier que les tokens sont bien configurés
-        const [wxdaiTokenAddr, wxdaiSupplyToken, wxdaiActive] = await rent2Repay.getTokenConfig(wxdaiAddress);
-        const [usdcTokenAddr, usdcSupplyToken, usdcActive] = await rent2Repay.getTokenConfig(usdcAddress);
+        const wxdaiConfig = await rent2Repay.tokenConfig(wxdaiAddress);
+        const usdcConfig = await rent2Repay.tokenConfig(usdcAddress);
 
         console.log(
-            wxdaiActive && wxdaiTokenAddr.toLowerCase() === wxdaiAddress.toLowerCase()
+            wxdaiConfig.active && wxdaiConfig.token.toLowerCase() === wxdaiAddress.toLowerCase()
                 ? "✅ check WXDAI token configuration"
                 : "❌ check WXDAI token configuration",
-            wxdaiTokenAddr
+            wxdaiConfig.token
         );
         console.log(
-            usdcActive && usdcTokenAddr.toLowerCase() === usdcAddress.toLowerCase()
+            usdcConfig.active && usdcConfig.token.toLowerCase() === usdcAddress.toLowerCase()
                 ? "✅ check USDC token configuration"
                 : "❌ check USDC token configuration",
-            usdcTokenAddr
+            usdcConfig.token
         );
 
         // ===== ÉTAPE 5: Configuration initiale =====

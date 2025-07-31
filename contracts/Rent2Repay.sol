@@ -50,8 +50,6 @@ contract Rent2Repay is
 
     /// @notice Maps user addresses to token addresses to their periodicity
     mapping(address => mapping(address => uint256)) public periodicity;
-
-    /// @dev Note: authorizedTokens mapping removed - now using tokenConfig[token].active
     
     /// @notice Maps token addresses to their debt token addresses
     mapping(address => TokenConfig) public tokenConfig;
@@ -435,29 +433,6 @@ contract Rent2Repay is
     }
 
     /**
-     * @notice Retrieves a user's configuration for a specific token
-     * @param user Address of the user
-     * @param token Address of the token
-     * @return MaxAmount The maximum amount per week for this token
-     * @return lastRepayTimestamp Timestamp of the last repayment (shared across tokens)
-     */
-    function getUserConfigForToken(address user, address token) 
-        external 
-        view 
-        returns (
-            uint256,
-            uint256,
-            uint256
-        ) 
-    {
-        return (
-            allowedMaxAmounts[user][token],
-            periodicity[user][token],
-            lastRepayTimestamps[user]
-        );
-    }
-
-    /**
      * @notice Retrieves all authorized tokens and their configurations for a user
      * @param user Address of the user
      * @return tokens Array of authorized token addresses
@@ -574,6 +549,7 @@ contract Rent2Repay is
      */
     function _removeUserAllTokens(address user) internal {
         lastRepayTimestamps[user] = 0;
+        
         emit RevokedR2R(user);
     }
 
@@ -758,40 +734,6 @@ contract Rent2Repay is
         }
     }
 
-
-    /**
-     * @notice Gets the token configuration for a given token
-     * @param token The token address
-     * @return tokenAddress The token address
-     * @return supplyToken The supply token address
-     * @return active Whether the token is active
-     */
-    function getTokenConfig(address token) external view returns (
-        address tokenAddress,
-        address supplyToken,
-        bool active
-    ) {
-        TokenConfig memory cfg = tokenConfig[token];
-        return (cfg.token, cfg.supplyToken, cfg.active);
-    }
-
-    /**
-     * @notice Returns the total number of tokens ever configured
-     * @return count Total count of tokens in history
-     */
-    function getTokenListLength() external view returns (uint256) {
-        return tokenList.length;
-    }
-
-    /**
-     * @notice Returns a token address by index from the complete list
-     * @param index Index in the token list
-     * @return token Token address at the specified index
-     */
-    function getTokenByIndex(uint256 index) external view returns (address) {
-        require(index < tokenList.length, "Index out of bounds");
-        return tokenList[index];
-    }
 
     /**
      * @notice Returns an array of active token addresses

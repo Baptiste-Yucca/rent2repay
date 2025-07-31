@@ -38,9 +38,10 @@ describe("Rent2Repay", function () {
         ).to.emit(rent2Repay, "ConfiguredR2R")
             .withArgs(addr1.address);
 
-        const config = await rent2Repay.getUserConfigForToken(addr1.address, await wxdaiToken.getAddress());
-        expect(config[0]).to.equal(weeklyLimit);
-        expect(config[1]).to.equal(periodicity);
+        const maxAmount = await rent2Repay.allowedMaxAmounts(addr1.address, await wxdaiToken.getAddress());
+        const userPeriodicity = await rent2Repay.periodicity(addr1.address, await wxdaiToken.getAddress());
+        expect(maxAmount).to.equal(weeklyLimit);
+        expect(userPeriodicity).to.equal(periodicity);
     });
 
     it("Devrait effectuer un remboursement avec token de base", async function () {

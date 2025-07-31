@@ -74,15 +74,15 @@ async function main() {
     let tokenConfig;
     let debtToken;
     try {
-        const [tokenAddress, debtTokenAddress, supplyTokenAddress, active] = await rent2Repay.getTokenConfig(await supplyToken.getAddress());
-        if (supplyTokenAddress === ethers.ZeroAddress) {
+        const tokenConfigData = await rent2Repay.tokenConfig(await supplyToken.getAddress());
+        if (tokenConfigData.supplyToken === ethers.ZeroAddress) {
             throw new Error("Supply token not configured");
         }
         tokenConfig = {
-            token: tokenAddress,
-            debtToken: debtTokenAddress,
-            supplyToken: supplyTokenAddress,
-            active: active
+            token: tokenConfigData.token,
+            debtToken: tokenConfigData.token, // debtToken is same as token in this case
+            supplyToken: tokenConfigData.supplyToken,
+            active: tokenConfigData.active
         };
         debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
     } catch (error) {
@@ -102,12 +102,12 @@ async function main() {
 
             console.log("   ✅ Token triple configuré avec succès");
 
-            const [tokenAddress, debtTokenAddress2, supplyTokenAddress2, active] = await rent2Repay.getTokenConfig(await supplyToken.getAddress());
+            const tokenConfigData2 = await rent2Repay.tokenConfig(await supplyToken.getAddress());
             tokenConfig = {
-                token: tokenAddress,
-                debtToken: debtTokenAddress2,
-                supplyToken: supplyTokenAddress2,
-                active: active
+                token: tokenConfigData2.token,
+                debtToken: tokenConfigData2.token, // debtToken is same as token in this case
+                supplyToken: tokenConfigData2.supplyToken,
+                active: tokenConfigData2.active
             };
             debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
         } catch (configError) {

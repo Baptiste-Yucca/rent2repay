@@ -58,15 +58,15 @@ async function main() {
     let debtToken;
     try {
         // Essayer d'abord avec le supply token
-        const [tokenAddress, debtTokenAddress, supplyTokenAddress, active] = await rent2Repay.getTokenConfig(await supplyToken.getAddress());
-        if (supplyTokenAddress === ethers.ZeroAddress) {
+        const tokenConfigData = await rent2Repay.tokenConfig(await supplyToken.getAddress());
+        if (tokenConfigData.supplyToken === ethers.ZeroAddress) {
             throw new Error("Supply token not configured");
         }
         tokenConfig = {
-            token: tokenAddress,
-            debtToken: debtTokenAddress,
-            supplyToken: supplyTokenAddress,
-            active: active
+            token: tokenConfigData.token,
+            debtToken: tokenConfigData.token, // debtToken is same as token in this case
+            supplyToken: tokenConfigData.supplyToken,
+            active: tokenConfigData.active
         };
         debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
     } catch (error) {
@@ -90,12 +90,12 @@ async function main() {
 
             // Récupérer la configuration mise à jour
             try {
-                const [tokenAddress, debtTokenAddress, supplyTokenAddress, active] = await rent2Repay.getTokenConfig(await supplyToken.getAddress());
+                const tokenConfigData2 = await rent2Repay.tokenConfig(await supplyToken.getAddress());
                 tokenConfig = {
-                    token: tokenAddress,
-                    debtToken: debtTokenAddress,
-                    supplyToken: supplyTokenAddress,
-                    active: active
+                    token: tokenConfigData2.token,
+                    debtToken: tokenConfigData2.token, // debtToken is same as token in this case
+                    supplyToken: tokenConfigData2.supplyToken,
+                    active: tokenConfigData2.active
                 };
                 debtToken = await ethers.getContractAt("MockDebtToken", tokenConfig.debtToken);
             } catch (getConfigError) {
@@ -214,7 +214,7 @@ async function main() {
         userDebtBalance: await debtToken.balanceOf(userAddress),
         runnerSupplyTokenBalance: await supplyToken.balanceOf(runnerAddress),
         daoTreasuryBalance: await supplyToken.balanceOf(daoConfig.treasuryAddress),
-        userConfiguredAmount: (await rent2Repay.getUserConfigForToken(userAddress, await supplyToken.getAddress()))[0]
+        userConfiguredAmount: await rent2Repay.allowedMaxAmounts(userAddress, await supplyToken.getAddress())
     };
 
     console.log("   État initial :");
