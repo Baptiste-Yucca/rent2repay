@@ -36,46 +36,60 @@ contract Rent2Repay is
         bool active;
     }
 
-    /// @notice RMM contract interface
-    IRMM public rmm;
-    
-    /// @notice Default interest rate mode (2 = Variable rate)
-    uint256 public constant DEFAULT_INTEREST_RATE_MODE = 2;
+    /// @custom:storage-location erc7201:rent2repay.storage
+    struct Rent2RepayStorage {
+        /// @notice RMM contract interface
+        IRMM rmm;
+        
+        /// @notice Default interest rate mode (2 = Variable rate)
+        uint256 defaultInterestRateMode;
 
-    /// @notice Maps user addresses to token addresses to their weekly maximum amount
-    mapping(address => mapping(address => uint256)) public allowedMaxAmounts;
-    
-    /// @notice Maps user addresses to their last repayment timestamp (shared across all tokens)
-    mapping(address => uint256) public lastRepayTimestamps;
+        /// @notice Maps user addresses to token addresses to their weekly maximum amount
+        mapping(address => mapping(address => uint256)) allowedMaxAmounts;
+        
+        /// @notice Maps user addresses to their last repayment timestamp (shared across all tokens)
+        mapping(address => uint256) lastRepayTimestamps;
 
-    /// @notice Maps user addresses to token addresses to their periodicity
-    mapping(address => mapping(address => uint256)) public periodicity;
-    
-    /// @notice Maps token addresses to their debt token addresses
-    mapping(address => TokenConfig) public tokenConfig;
+        /// @notice Maps user addresses to token addresses to their periodicity
+        mapping(address => mapping(address => uint256)) periodicity;
+        
+        /// @notice Maps token addresses to their debt token addresses
+        mapping(address => TokenConfig) tokenConfig;
 
-    /// @notice Array to keep track of all tokens that have been configured at least once
-    /// @dev Use tokenConfig[token].active to check if a token is currently active
-    address[] public tokenList;
+        /// @notice Array to keep track of all tokens that have been configured at least once
+        /// @dev Use tokenConfig[token].active to check if a token is currently active
+        address[] tokenList;
 
-    /// @notice DAO fees in basis points (BPS) - 10000 = 100%
-    uint256 public daoFeesBPS;
-    
-    /// @notice Sender tips in basis points (BPS) - 10000 = 100%
-    uint256 public senderTipsBPS;
+        /// @notice DAO fees in basis points (BPS) - 10000 = 100%
+        uint256 daoFeesBPS;
+        
+        /// @notice Sender tips in basis points (BPS) - 10000 = 100%
+        uint256 senderTipsBPS;
 
-    /// @notice Token address for DAO fee reduction - if user holds this token above minimum 
-    /// amount, DAO fees are reduced
-    address public daoFeeReductionToken;
-    
-    /// @notice Minimum amount of daoFeeReductionToken required to get DAO fee reduction
-    uint256 public daoFeeReductionMinimumAmount;
+        /// @notice Token address for DAO fee reduction - if user holds this token above minimum 
+        /// amount, DAO fees are reduced
+        address daoFeeReductionToken;
+        
+        /// @notice Minimum amount of daoFeeReductionToken required to get DAO fee reduction
+        uint256 daoFeeReductionMinimumAmount;
 
-    /// @notice DAO fee reduction percentage in basis points (BPS) - 10000 = 100% 
-    uint256 public daoFeeReductionBPS;
+        /// @notice DAO fee reduction percentage in basis points (BPS) - 10000 = 100% 
+        uint256 daoFeeReductionBPS;
 
-    /// @notice DAO treasury address that receives DAO fees
-    address public daoTreasuryAddress;
+        /// @notice DAO treasury address that receives DAO fees
+        address daoTreasuryAddress;
+    }
+
+    /**
+     * @dev Pointer to storage slot. Allows integrators to override it with a custom storage location.
+     *
+     * NOTE: Consider following the ERC-7201 formula to derive storage locations.
+     */
+    function _getRent2RepayStorage() private pure returns (Rent2RepayStorage storage $) {
+        assembly {
+            $.slot := 0x52C63247E1F47d19d5ce046630c49f7C67dcaEcfb71ba98eedaab2ebca6e0
+        }
+    }
 
     /// @notice Emitted when a user revokes all their Rent2Repay authorizations
     /// @param user The user address that revoked all authorizations
@@ -129,12 +143,14 @@ contract Rent2Repay is
         _grantRole(EMERGENCY_ROLE, emergency);
         _grantRole(OPERATOR_ROLE, operator);
         
-        rmm = IRMM(_rmm);
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        $.rmm = IRMM(_rmm);
         
         /// @dev Initialize default fee values
-        daoFeesBPS = 50; /// @dev 0.5% default
-        senderTipsBPS = 25; /// @dev 0.25% default
-        daoFeeReductionBPS = 5000; /// @dev 50% default
+        $.daoFeesBPS = 50; /// @dev 0.5% default
+        $.senderTipsBPS = 25; /// @dev 0.25% default
+        $.daoFeeReductionBPS = 5000; /// @dev 50% default
+        $.defaultInterestRateMode = 2; /// @dev Default interest rate mode (2 = Variable rate)
         
         /// @dev Initialize with WXDAI and USDC as authorized token pairs
         _authorizeTokenPair(wxdaiToken, wxdaiArmmToken);
@@ -164,7 +180,8 @@ contract Rent2Repay is
      * @param token The token address to validate
      */
     modifier onlyAuthorizedToken(address token) {
-        if (!tokenConfig[token].active) revert TokenNotAuthorized();
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        if (!$.tokenConfig[token].active) revert TokenNotAuthorized();
         _;
     }
 
@@ -179,28 +196,29 @@ contract Rent2Repay is
         uint256  period,
         uint256  _timestamp
     ) external whenNotPaused {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
         uint256 len = tokens.length;
         require(len > 0 && len == amounts.length, "Invalid array lengths");
             
         /// @dev Force to clean up data
-        uint256 maxLength = tokenList.length;
+        uint256 maxLength = $.tokenList.length;
         for (uint256 i = 0; i < maxLength;) {
-            allowedMaxAmounts[msg.sender][tokenList[i]] = 0;
-            periodicity[msg.sender][tokenList[i]] = 0;
+            $.allowedMaxAmounts[msg.sender][$.tokenList[i]] = 0;
+            $.periodicity[msg.sender][$.tokenList[i]] = 0;
             unchecked { ++i; }
         }
         
         /// @dev Valorize values
         for (uint256 i = 0; i < len;) {
-            require(tokens[i] != address(0) && tokenConfig[tokens[i]].active && amounts[i] > 0,
+            require(tokens[i] != address(0) && $.tokenConfig[tokens[i]].active && amounts[i] > 0,
                 "Invalid token or amount");
-            allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
-            periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
+            $.allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
+            $.periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
             unchecked { ++i; }
         }
         
         /// @dev Initialize/activate user with timestamp (0 = inactive, !=0 = active)
-        lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
+        $.lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
         
         emit ConfiguredR2R(msg.sender);
     }
@@ -247,7 +265,8 @@ contract Rent2Repay is
      * @return true if authorized, false otherwise
      */
     function isAuthorized(address user) public view returns (bool) {
-        return lastRepayTimestamps[user] != 0;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.lastRepayTimestamps[user] != 0;
     }
     
 
@@ -258,9 +277,10 @@ contract Rent2Repay is
      * @param token The token address to validate
      */
     function _validateUserAndToken(address user, address token) internal view {
-        require(lastRepayTimestamps[user] != 0, "User not authorized");
-        require(allowedMaxAmounts[user][token] > 0, "User not configured for token");
-        require(periodicity[user][token] > 0, "Periodicity not set");
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        require($.lastRepayTimestamps[user] != 0, "User not authorized");
+        require($.allowedMaxAmounts[user][token] > 0, "User not configured for token");
+        require($.periodicity[user][token] > 0, "Periodicity not set");
         require(_isNewPeriod(user, token), "Wait next period");
     }
 
@@ -277,6 +297,7 @@ contract Rent2Repay is
         internal 
         returns (uint256 adjustedDaoFees, uint256 senderTips, uint256 actualAmountRepaid) 
     {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
         _validateUserAndToken(user, token);
         
         /// @dev Step 1: Calculate and transfer tokens
@@ -289,7 +310,7 @@ contract Rent2Repay is
             user, token, daoFees, amountForRepayment
         );
         
-        lastRepayTimestamps[user] = block.timestamp;
+        $.lastRepayTimestamps[user] = block.timestamp;
         /// @dev No emit, transfer ERC20, track them from TheGraph
     }
 
@@ -306,7 +327,8 @@ contract Rent2Repay is
         internal 
         returns (uint256 daoFees, uint256 senderTips, uint256 amountForRepayment) 
     {
-        uint256 amount = allowedMaxAmounts[user][token];
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        uint256 amount = $.allowedMaxAmounts[user][token];
         uint256 balance = IERC20(token).balanceOf(user);
         uint256 toTransfer = balance < amount ? balance : amount;
 
@@ -337,12 +359,13 @@ contract Rent2Repay is
         internal 
         returns (uint256 actualAmountRepaid, uint256 adjustedDaoFees) 
     {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
 
-        if(tokenConfig[token].supplyToken == token) {
+        if($.tokenConfig[token].supplyToken == token) {
             /// @dev Note: if fail, revert all
             require(
-                rmm.withdraw(
-                    tokenConfig[token].token, 
+                $.rmm.withdraw(
+                    $.tokenConfig[token].token, 
                     amountForRepayment, 
                     address(this)
                 ) == amountForRepayment, 
@@ -350,17 +373,17 @@ contract Rent2Repay is
             );
         }
         
-        actualAmountRepaid = rmm.repay(
-            tokenConfig[token].token,
+        actualAmountRepaid = $.rmm.repay(
+            $.tokenConfig[token].token,
             amountForRepayment,
-            DEFAULT_INTEREST_RATE_MODE,
+            $.defaultInterestRateMode,
             user
         );
 
         uint256 difference = amountForRepayment - actualAmountRepaid;
         if(difference > 0) {
             require(
-                IERC20(tokenConfig[token].token).transfer(user, difference),
+                IERC20($.tokenConfig[token].token).transfer(user, difference),
                 "transfer to user failed"
             );
         }
@@ -446,23 +469,24 @@ contract Rent2Repay is
             uint256[] memory maxAmounts
         )
     {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
         /// @dev If user is not authorized, return empty arrays
-        if (lastRepayTimestamps[user] == 0) {
+        if ($.lastRepayTimestamps[user] == 0) {
             return (new address[](0), new uint256[](0));
         }
 
-        uint256 maxLength = tokenList.length;
+        uint256 maxLength = $.tokenList.length;
         tokens = new address[](maxLength);
         maxAmounts = new uint256[](maxLength);
 
         uint256 index;
         for (uint256 i = 0; i < maxLength; ) {
             if (
-                tokenConfig[tokenList[i]].active &&
-                allowedMaxAmounts[user][tokenList[i]] > 0
+                $.tokenConfig[$.tokenList[i]].active &&
+                $.allowedMaxAmounts[user][$.tokenList[i]] > 0
             ) {
-                tokens[index] = tokenList[i];
-                maxAmounts[index] = allowedMaxAmounts[user][tokenList[i]];
+                tokens[index] = $.tokenList[i];
+                maxAmounts[index] = $.allowedMaxAmounts[user][$.tokenList[i]];
                 unchecked { ++index; }
             }
             unchecked { ++i; }
@@ -492,15 +516,16 @@ contract Rent2Repay is
      * @param supplyToken The supply token address associated with the token
      */
     function _authorizeTokenPair(address token, address supplyToken) internal {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
         TokenConfig memory config = TokenConfig({
             token: token,
             supplyToken: supplyToken,
             active: true
         });
         
-        tokenConfig[token] = config;
-        tokenConfig[supplyToken] = config;
-        tokenList.push(token);
+        $.tokenConfig[token] = config;
+        $.tokenConfig[supplyToken] = config;
+        $.tokenList.push(token);
     }
 
     /**
@@ -511,8 +536,9 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        tokenConfig[token].active = false;
-        tokenConfig[tokenConfig[token].supplyToken].active = false;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        $.tokenConfig[token].active = false;
+        $.tokenConfig[$.tokenConfig[token].supplyToken].active = false;
 
         /// @dev Token remains in tokenList for historical tracking
         /// @dev Use tokenConfig[token].active to check current status
@@ -548,7 +574,17 @@ contract Rent2Repay is
      * @param user The user to remove
      */
     function _removeUserAllTokens(address user) internal {
-        lastRepayTimestamps[user] = 0;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        // Nettoyer le timestamp (désactive l'utilisateur)
+        $.lastRepayTimestamps[user] = 0;
+        
+        // Nettoyer les configurations pour tous les tokens
+        uint256 maxLength = $.tokenList.length;
+        for (uint256 i = 0; i < maxLength;) {
+            $.allowedMaxAmounts[user][$.tokenList[i]] = 0;
+            $.periodicity[user][$.tokenList[i]] = 0;
+            unchecked { ++i; }
+        }
         
         emit RevokedR2R(user);
     }
@@ -560,7 +596,8 @@ contract Rent2Repay is
      * @return true if more than a week has passed since lastTimestamp
      */
     function _isNewPeriod(address _user, address _token) internal view returns (bool) {
-        return block.timestamp >= lastRepayTimestamps[_user] + periodicity[_user][_token];
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return block.timestamp >= $.lastRepayTimestamps[_user] + $.periodicity[_user][_token];
     }
 
     /**
@@ -576,15 +613,16 @@ contract Rent2Repay is
         uint256 senderTips,
         uint256 amountForRepayment
     ) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
         /// @dev Calculate base fees
-        daoFees = (amount * daoFeesBPS) / 10000;
-        senderTips = (amount * senderTipsBPS) / 10000;
+        daoFees = (amount * $.daoFeesBPS) / 10000;
+        senderTips = (amount * $.senderTipsBPS) / 10000;
 
-        if (daoFeeReductionToken != address(0) && daoFeeReductionMinimumAmount > 0) {
-            uint256 userBalance = IERC20(daoFeeReductionToken).balanceOf(user);
-            if (userBalance >= daoFeeReductionMinimumAmount) {
+        if ($.daoFeeReductionToken != address(0) && $.daoFeeReductionMinimumAmount > 0) {
+            uint256 userBalance = IERC20($.daoFeeReductionToken).balanceOf(user);
+            if (userBalance >= $.daoFeeReductionMinimumAmount) {
                 /// @dev Reduce DAO fees by the configured percentage (BPS)
-                uint256 reductionAmount = (daoFees * daoFeeReductionBPS) / 10000;
+                uint256 reductionAmount = (daoFees * $.daoFeeReductionBPS) / 10000;
                 daoFees = daoFees - reductionAmount;
             }
         }
@@ -619,8 +657,9 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        if (newFeesBPS + senderTipsBPS > 10000) revert InvalidFeesBPS();
-        daoFeesBPS = newFeesBPS;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        if (newFeesBPS + $.senderTipsBPS > 10000) revert InvalidFeesBPS();
+        $.daoFeesBPS = newFeesBPS;
     }
 
     /**
@@ -631,8 +670,9 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        if (daoFeesBPS + newTipsBPS > 10000) revert InvalidTipsBPS();
-        senderTipsBPS = newTipsBPS;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        if ($.daoFeesBPS + newTipsBPS > 10000) revert InvalidTipsBPS();
+        $.senderTipsBPS = newTipsBPS;
     }
 
     /**
@@ -645,7 +685,8 @@ contract Rent2Repay is
         view 
         returns (uint256 daoFees, uint256 senderTips) 
     {
-        return (daoFeesBPS, senderTipsBPS);
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return ($.daoFeesBPS, $.senderTipsBPS);
     }
 
     /**
@@ -665,11 +706,12 @@ contract Rent2Repay is
             address treasuryAddress
         ) 
     {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
         return (
-            daoFeeReductionToken, 
-            daoFeeReductionMinimumAmount, 
-            daoFeeReductionBPS, 
-            daoTreasuryAddress
+            $.daoFeeReductionToken, 
+            $.daoFeeReductionMinimumAmount, 
+            $.daoFeeReductionBPS, 
+            $.daoTreasuryAddress
         );
     }
 
@@ -682,7 +724,8 @@ contract Rent2Repay is
         onlyRole(ADMIN_ROLE) 
         validTokenAddress(newToken)
     {
-        daoFeeReductionToken = newToken;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        $.daoFeeReductionToken = newToken;
     }
 
     /**
@@ -693,7 +736,8 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        daoFeeReductionMinimumAmount = newMinimumAmount;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        $.daoFeeReductionMinimumAmount = newMinimumAmount;
     }
 
     /**
@@ -704,7 +748,8 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        daoFeeReductionBPS = newPercentage;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        $.daoFeeReductionBPS = newPercentage;
     }
 
     /**
@@ -715,7 +760,8 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        daoTreasuryAddress = newAddress;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        $.daoTreasuryAddress = newAddress;
     }
 
     /**
@@ -725,8 +771,9 @@ contract Rent2Repay is
      * @param senderTips The sender tips amount
      */
     function _transferFees(address token, uint256 daoFees, uint256 senderTips) internal {
-        if (daoFees > 0 && daoTreasuryAddress != address(0)) {
-            require(IERC20(token).transfer(daoTreasuryAddress, daoFees), "Transfer to DAO failed");
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        if (daoFees > 0 && $.daoTreasuryAddress != address(0)) {
+            require(IERC20(token).transfer($.daoTreasuryAddress, daoFees), "Transfer to DAO failed");
         }
         
         if (senderTips > 0) {
@@ -741,14 +788,15 @@ contract Rent2Repay is
      * @return activeTokens Array of currently active token addresses
      */
     function getActiveTokens() external view returns (address[] memory activeTokens) {
-        uint256 len = tokenList.length;
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        uint256 len = $.tokenList.length;
         /// @dev Allocate array with maximum size directly
         activeTokens = new address[](len);
 
         uint256 count;
         for (uint256 i; i < len; ) {
-            address t = tokenList[i];
-            if (tokenConfig[t].active) {
+            address t = $.tokenList[i];
+            if ($.tokenConfig[t].active) {
                 activeTokens[count] = t;
                 unchecked { ++count; }
             }
@@ -756,7 +804,7 @@ contract Rent2Repay is
         }
 
         // Shrink array by writing count as new length using assembly
-        assembly { 
+        assembly {
             mstore(activeTokens, count) 
         }
     }
@@ -778,5 +826,66 @@ contract Rent2Repay is
      */
     function version() external pure returns (string memory) {
         return "1.0.0";
+    }
+
+    // Public getters for storage variables
+    function rmm() external view returns (IRMM) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.rmm;
+    }
+
+    function allowedMaxAmounts(address user, address token) external view returns (uint256) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.allowedMaxAmounts[user][token];
+    }
+
+    function lastRepayTimestamps(address user) external view returns (uint256) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.lastRepayTimestamps[user];
+    }
+
+    function periodicity(address user, address token) external view returns (uint256) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.periodicity[user][token];
+    }
+
+    function tokenConfig(address token) external view returns (TokenConfig memory) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.tokenConfig[token];
+    }
+
+    function tokenList(uint256 index) external view returns (address) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.tokenList[index];
+    }
+
+    function daoFeesBPS() external view returns (uint256) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.daoFeesBPS;
+    }
+
+    function senderTipsBPS() external view returns (uint256) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.senderTipsBPS;
+    }
+
+    function daoFeeReductionToken() external view returns (address) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.daoFeeReductionToken;
+    }
+
+    function daoFeeReductionMinimumAmount() external view returns (uint256) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.daoFeeReductionMinimumAmount;
+    }
+
+    function daoFeeReductionBPS() external view returns (uint256) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.daoFeeReductionBPS;
+    }
+
+    function daoTreasuryAddress() external view returns (address) {
+        Rent2RepayStorage storage $ = _getRent2RepayStorage();
+        return $.daoTreasuryAddress;
     }
 } 
