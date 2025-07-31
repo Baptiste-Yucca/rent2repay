@@ -555,4 +555,133 @@ describe("Rent2Repay", function () {
             console.log("🎉 Test complet: L'utilisateur désactive tout ou rien, et doit reconfigurer pour forcer les params !");
         });
     });
+
+    describe("Public Getters Tests", function () {
+        it("Devrait retourner les bonnes valeurs pour tous les getters publics", async function () {
+            // Test rmm getter
+            const rmmAddress = await rent2Repay.rmm();
+            expect(rmmAddress).to.equal(await mockRMM.getAddress());
+            console.log("✅ rmm() getter fonctionne");
+
+            // Test lastRepayTimestamps getter
+            const timestamp = await rent2Repay.lastRepayTimestamps(addr1.address);
+            expect(timestamp).to.equal(0); // Utilisateur non configuré
+            console.log("✅ lastRepayTimestamps() getter fonctionne");
+
+            // Test daoFeesBPS getter
+            const daoFees = await rent2Repay.daoFeesBPS();
+            expect(daoFees).to.equal(50); // Valeur par défaut
+            console.log("✅ daoFeesBPS() getter fonctionne");
+
+            // Test senderTipsBPS getter
+            const senderTips = await rent2Repay.senderTipsBPS();
+            expect(senderTips).to.equal(25); // Valeur par défaut
+            console.log("✅ senderTipsBPS() getter fonctionne");
+
+            // Test daoFeeReductionToken getter
+            const daoFeeReductionToken = await rent2Repay.daoFeeReductionToken();
+            expect(daoFeeReductionToken).to.equal(ethers.ZeroAddress); // Valeur par défaut
+            console.log("✅ daoFeeReductionToken() getter fonctionne");
+
+            // Test daoFeeReductionMinimumAmount getter
+            const daoFeeReductionMinimumAmount = await rent2Repay.daoFeeReductionMinimumAmount();
+            expect(daoFeeReductionMinimumAmount).to.equal(0); // Valeur par défaut
+            console.log("✅ daoFeeReductionMinimumAmount() getter fonctionne");
+
+            // Test daoFeeReductionBPS getter
+            const daoFeeReductionBPS = await rent2Repay.daoFeeReductionBPS();
+            expect(daoFeeReductionBPS).to.equal(5000); // Valeur par défaut
+            console.log("✅ daoFeeReductionBPS() getter fonctionne");
+
+            // Test daoTreasuryAddress getter
+            const daoTreasuryAddress = await rent2Repay.daoTreasuryAddress();
+            // Note: daoTreasuryAddress peut être configuré par d'autres tests
+            expect(daoTreasuryAddress).to.not.be.undefined;
+            console.log("✅ daoTreasuryAddress() getter fonctionne");
+        });
+
+        it("Devrait retourner les bonnes valeurs après configuration", async function () {
+            // Configurer un utilisateur
+            const weeklyLimit = ethers.parseUnits("100", 18);
+            const timestamp = Math.floor(Date.now() / 1000);
+
+            await rent2Repay.connect(addr1).configureRent2Repay(
+                [await wxdaiToken.getAddress()],
+                [weeklyLimit],
+                604800,
+                timestamp
+            );
+
+            // Test lastRepayTimestamps après configuration
+            const userTimestamp = await rent2Repay.lastRepayTimestamps(addr1.address);
+            expect(userTimestamp).to.equal(timestamp);
+            console.log("✅ lastRepayTimestamps() retourne la bonne valeur après configuration");
+
+            // Test allowedMaxAmounts
+            const maxAmount = await rent2Repay.allowedMaxAmounts(addr1.address, await wxdaiToken.getAddress());
+            expect(maxAmount).to.equal(weeklyLimit);
+            console.log("✅ allowedMaxAmounts() retourne la bonne valeur");
+
+            // Test periodicity
+            const userPeriodicity = await rent2Repay.periodicity(addr1.address, await wxdaiToken.getAddress());
+            expect(userPeriodicity).to.equal(604800);
+            console.log("✅ periodicity() retourne la bonne valeur");
+
+            // Test tokenConfig
+            const tokenConfig = await rent2Repay.tokenConfig(await wxdaiToken.getAddress());
+            expect(tokenConfig.active).to.be.true;
+            expect(tokenConfig.token).to.equal(await wxdaiToken.getAddress());
+            console.log("✅ tokenConfig() retourne la bonne configuration");
+
+            // Test tokenList
+            const tokenAtIndex = await rent2Repay.tokenList(0);
+            expect(tokenAtIndex).to.equal(await wxdaiToken.getAddress());
+            console.log("✅ tokenList() retourne le bon token");
+        });
+
+        it("Devrait retourner les bonnes valeurs après mise à jour des fees", async function () {
+            // Mettre à jour les fees
+            await rent2Repay.connect(admin).updateDaoFees(100);
+            await rent2Repay.connect(admin).updateSenderTips(50);
+
+            // Vérifier les nouvelles valeurs
+            const newDaoFees = await rent2Repay.daoFeesBPS();
+            expect(newDaoFees).to.equal(100);
+            console.log("✅ daoFeesBPS() retourne la nouvelle valeur");
+
+            const newSenderTips = await rent2Repay.senderTipsBPS();
+            expect(newSenderTips).to.equal(50);
+            console.log("✅ senderTipsBPS() retourne la nouvelle valeur");
+        });
+
+        it("Devrait retourner les bonnes valeurs après configuration DAO", async function () {
+            // Configurer les paramètres DAO
+            const testToken = "0x0000000000000000000000000000000000000123";
+            const testTreasury = "0x0000000000000000000000000000000000000456";
+            const minAmount = ethers.parseEther("1000");
+            const reductionBPS = 3000;
+
+            await rent2Repay.connect(admin).updateDaoFeeReductionToken(testToken);
+            await rent2Repay.connect(admin).updateDaoTreasuryAddress(testTreasury);
+            await rent2Repay.connect(admin).updateDaoFeeReductionMinimumAmount(minAmount);
+            await rent2Repay.connect(admin).updateDaoFeeReductionPercentage(reductionBPS);
+
+            // Vérifier les nouvelles valeurs
+            const daoFeeReductionToken = await rent2Repay.daoFeeReductionToken();
+            expect(daoFeeReductionToken).to.equal(testToken);
+            console.log("✅ daoFeeReductionToken() retourne la nouvelle valeur");
+
+            const daoTreasuryAddress = await rent2Repay.daoTreasuryAddress();
+            expect(daoTreasuryAddress).to.equal(testTreasury);
+            console.log("✅ daoTreasuryAddress() retourne la nouvelle valeur");
+
+            const daoFeeReductionMinimumAmount = await rent2Repay.daoFeeReductionMinimumAmount();
+            expect(daoFeeReductionMinimumAmount).to.equal(minAmount);
+            console.log("✅ daoFeeReductionMinimumAmount() retourne la nouvelle valeur");
+
+            const daoFeeReductionBPS = await rent2Repay.daoFeeReductionBPS();
+            expect(daoFeeReductionBPS).to.equal(reductionBPS);
+            console.log("✅ daoFeeReductionBPS() retourne la nouvelle valeur");
+        });
+    });
 }); 
