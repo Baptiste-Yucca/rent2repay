@@ -17,6 +17,7 @@
     "upgrade:contract": "npx hardhat run scripts/upgrade-contract.js --network localhost",
     "test:upgrade": "npx hardhat test test/Rent2Repay.upgrade.test.js",
     "test:users": "node scripts/cli/show-users.js",
+    "setup:local": "yarn deploy:local && yarn test:users",
     "test:config": "node scripts/cli/quick-config.js",
     "test:repay": "node scripts/cli/quick-repayment.js",
     "test:concurrency": "node scripts/cli/quick-concurrency.js",

@@ -9,7 +9,7 @@
 - npm or yarn
 - Git
 
-### Installation
+### Installation & Setup
 
 1. **Clone the repository**
    ```bash
@@ -27,12 +27,14 @@
    npm run compile
    ```
 
-4. **Run tests**
+4. **Deploy and test (recommended)**
    ```bash
-   npm test
+   npm run setup:local
    ```
 
-### Development Setup
+### Alternative Setup
+
+If you prefer manual deployment:
 
 1. **Start local blockchain**
    ```bash
@@ -44,7 +46,35 @@
    npm run deploy:local
    ```
 
-3. **Run coverage analysis**
+3. **Test user configuration**
+   ```bash
+   npm run test:users
+   ```
+
+4. **Run all tests**
+   ```bash
+   npm test
+   ```
+
+### Development Setup
+
+1. **Start local blockchain**
+   ```bash
+   npx hardhat node
+   ```
+
+2. **Deploy contracts and test (new terminal)**
+   ```bash
+   npm run setup:local
+   ```
+
+3. **Or deploy manually**
+   ```bash
+   npm run deploy:local
+   npm run test:users
+   ```
+
+4. **Run coverage analysis**
    ```bash
    npm run coverage
    ```
@@ -95,6 +125,14 @@ Rent2Repay is a smart contract system that enables automated debt repayments thr
 - `npm run test:config` - Quick configuration test
 - `npm run test:repay` - Quick repayment test
 - `npm run demo` - Run complete demo
+
+### CLI Tools
+- `npm run setup:local` - Deploy and test in one command
+- `npm run test:users` - Display all test users
+- `npm run test:config` - Quick user configuration
+- `npm run test:repay` - Quick repayment test
+- `npm run test:concurrency` - Test concurrent executions
+- `npm run test:status` - Show user status
 
 ## 🏗️ Architecture
 
