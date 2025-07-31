@@ -398,10 +398,10 @@ contract Rent2Repay is
         onlyAuthorizedToken(token)
         nonReentrant
     {
-        uint256 totalDaoFees =0;
-        uint256 totalSenderTips =0;
-        uint256 adjustedDaoFees =0;
-        uint256 senderTips =0;
+        uint256 totalDaoFees;
+        uint256 totalSenderTips;
+        uint256 adjustedDaoFees;
+        uint256 senderTips;
         address user ;
      
         
