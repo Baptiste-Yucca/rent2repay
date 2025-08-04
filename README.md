@@ -109,6 +109,11 @@ Rent2Repay is a smart contract system that enables automated debt repayments thr
 - `npm run coverage` - Generate test coverage report
 - `npm run deploy:local` - Deploy contracts to local network
 
+### Production Scripts
+- `npm run deploy:tenderly` - Deploy to Tenderly fork (Gnosis)
+- `npm run deploy:gnosis` - Deploy to Gnosis Chain mainnet
+- `npm run check:tenderly` - Verify deployment on Tenderly
+
 ### Upgradeable Contract Scripts
 - `npm run deploy:upgradable` - Deploy upgradeable contracts with proxy
 - `npm run upgrade:contract` - Upgrade existing contract to new implementation
@@ -200,6 +205,17 @@ function initialize(
 2. Call `upgradeProxy()` with new implementation address
 3. State is preserved, only logic is updated
 4. Version tracking through `version()` function
+
+## 🧪 Déploiement Tenderly
+
+Pour tester sur Gnosis Chain via Tenderly :
+
+1. **Configuration** : Remplir `config-gnosis.js`
+2. **Variables d'environnement** : Voir `ENV_SETUP.md`
+3. **Déploiement** : `npm run deploy:tenderly`
+4. **Vérification** : `npm run check:tenderly`
+
+Voir `TENDERLY_GUIDE.md` pour le guide complet.
 
 ## 📁 Project Structure
 

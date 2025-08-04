@@ -28,6 +28,16 @@ module.exports = {
       url: process.env.CHIADO_RPC_URL || "https://rpc.chiadochain.net",
       chainId: 10200,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
+    },
+    gnosis: {
+      url: process.env.GNOSIS_RPC_URL || "https://rpc.gnosischain.com",
+      chainId: 100,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
+    },
+    tenderly: {
+      url: process.env.TENDERLY_RPC_URL || "https://rpc.tenderly.co/fork/your-fork-id",
+      chainId: 100,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     }
   },
   etherscan: {
