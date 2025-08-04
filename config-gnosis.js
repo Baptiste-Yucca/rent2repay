@@ -23,7 +23,7 @@ module.exports = {
     // ===== TOKENS SUPPLY RMM =====
     // Tokens de supply correspondants dans RMM
     WXDAI_SUPPLY_TOKEN: "0x0cA4f5554Dd9Da6217d62D8df2816c82bba4157b", // Token de supply WXDAI dans RMM
-    USDC_SUPPLY_TOKEN: "0xeD56F76E9cBC6A64b821e9c016eAFbd3db5436D1  ", // Token de supply USDC dans RMM
+    USDC_SUPPLY_TOKEN: "0xeD56F76E9cBC6A64b821e9c016eAFbd3db5436D1", // Token de supply USDC dans RMM
 
     // ===== ADRESSES ADMIN =====
     // Adresse qui aura le rôle ADMIN (peut être une multisig)
@@ -57,7 +57,7 @@ module.exports = {
     RPC_URL: "https://rpc.gnosischain.com", // RPC public Gnosis
 
     // URL RPC Tenderly (optionnel - pour les tests)
-    TENDERLY_RPC_URL: "ADDRESS_TO_FILL", // URL RPC Tenderly si disponible
+    TENDERLY_RPC_URL: "https://virtual.gnosis.eu.rpc.tenderly.co/51ab56e7-b119-400a-80ce-476babd64c8a", // URL RPC Tenderly si disponible
 };
 
 /**
