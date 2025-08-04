@@ -9,10 +9,6 @@ Copiez ce contenu dans un fichier `.env` à la racine du projet :
 # URL RPC de votre fork Tenderly
 TENDERLY_RPC_URL=https://rpc.tenderly.co/fork/your-fork-id
 
-# Clé privée pour signer les transactions
-# ATTENTION: Ne jamais commiter ce fichier avec une vraie clé privée!
-PRIVATE_KEY=your-private-key-here
-
 # ===== CONFIGURATION GNOSIS =====
 # URL RPC Gnosis Chain (optionnel)
 GNOSIS_RPC_URL=https://rpc.gnosischain.com
@@ -35,16 +31,7 @@ GNOSISSCAN_API_KEY=your-gnosisscan-api-key
 3. Copier l'URL RPC du fork
 4. Remplacer `your-fork-id` par l'ID de votre fork
 
-### 2. PRIVATE_KEY
-
-⚠️ **ATTENTION: Ne jamais partager votre clé privée!**
-
-```bash
-# Exemple de clé privée (NE PAS UTILISER EN PRODUCTION)
-PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-```
-
-### 3. GNOSISSCAN_API_KEY (optionnel)
+### 2. GNOSISSCAN_API_KEY (optionnel)
 
 1. Aller sur https://gnosisscan.io
 2. Créer un compte
@@ -77,7 +64,6 @@ npm run check:env
 ```bash
 # .env
 TENDERLY_RPC_URL=https://rpc.tenderly.co/fork/abc123def456
-PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
 GNOSIS_RPC_URL=https://rpc.gnosischain.com
 CHIADO_RPC_URL=https://rpc.chiadochain.net
 GNOSISSCAN_API_KEY=ABC123DEF456

@@ -45,7 +45,6 @@ code config-gnosis.js
 
 ```bash
 TENDERLY_RPC_URL=https://rpc.tenderly.co/fork/your-fork-id
-PRIVATE_KEY=your-private-key
 ```
 
 ### 3. Déploiement
@@ -108,7 +107,6 @@ await rent2Repay.rent2repay("USER_ADDRESS", "WXDAI_ADDRESS");
 ```bash
 # .env
 TENDERLY_RPC_URL=https://rpc.tenderly.co/fork/your-fork-id
-PRIVATE_KEY=your-private-key
 GNOSIS_RPC_URL=https://rpc.gnosischain.com
 ```
 
