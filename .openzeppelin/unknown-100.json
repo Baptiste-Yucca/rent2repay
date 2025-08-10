@@ -1,0 +1,411 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0x29eC73E5fefc8CeC302bBDe12a96F4E4fEF6be82",
+      "txHash": "0xec9d330d08a5f12dbfb2e4fef7354874d4f9c651b1019ea88d744cd12cab8ad2",
+      "kind": "uups"
+    },
+    {
+      "address": "0x630c09aEDdc373a7DF3A15A2ed2bd3819ccFbaB4",
+      "txHash": "0x258dd0539ff97b4e3c9999cc694d5ea87f6955bfcd1d1faf14101a56a005f8f1",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "b8f1875438a7814c43e3c09bbb083a077b923ba6d57b3b40140aaf0060af0f93": {
+      "address": "0x4B362c92D6C48C6e7fa134dd33B1e9A6A177F7D6",
+      "txHash": "0xda181c0cd149012cb025ce7c2b1f6a4748305250e2bb5ea90c2f26bef75bbd51",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IRMM)1581": {
+            "label": "contract IRMM",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(TokenConfig)1129_storage)": {
+            "label": "mapping(address => struct Rent2Repay.TokenConfig)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)24_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)24_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)145_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(PausableStorage)296_storage": {
+            "label": "struct PausableUpgradeable.PausableStorage",
+            "members": [
+              {
+                "label": "_paused",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)360_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(Rent2RepayStorage)1172_storage": {
+            "label": "struct Rent2Repay.Rent2RepayStorage",
+            "members": [
+              {
+                "label": "rmm",
+                "type": "t_contract(IRMM)1581",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "defaultInterestRateMode",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "allowedMaxAmounts",
+                "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "lastRepayTimestamps",
+                "type": "t_mapping(t_address,t_uint256)",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "periodicity",
+                "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "tokenConfig",
+                "type": "t_mapping(t_address,t_struct(TokenConfig)1129_storage)",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "tokenList",
+                "type": "t_array(t_address)dyn_storage",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "daoFeesBPS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "senderTipsBPS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "daoFeeReductionToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "daoFeeReductionMinimumAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "daoFeeReductionBPS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "daoTreasuryAddress",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "12"
+              }
+            ],
+            "numberOfBytes": "416"
+          },
+          "t_struct(RoleData)24_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TokenConfig)1129_storage": {
+            "label": "struct Rent2Repay.TokenConfig",
+            "members": [
+              {
+                "label": "token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "supplyToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "active",
+                "type": "t_bool",
+                "offset": 20,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          }
+        },
+        "namespaces": {
+          "erc7201:rent2repay.storage": [
+            {
+              "contract": "Rent2Repay",
+              "label": "rmm",
+              "type": "t_contract(IRMM)1581",
+              "src": "contracts/Rent2Repay.sol:42",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "defaultInterestRateMode",
+              "type": "t_uint256",
+              "src": "contracts/Rent2Repay.sol:45",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "allowedMaxAmounts",
+              "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+              "src": "contracts/Rent2Repay.sol:48",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "lastRepayTimestamps",
+              "type": "t_mapping(t_address,t_uint256)",
+              "src": "contracts/Rent2Repay.sol:51",
+              "offset": 0,
+              "slot": "3"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "periodicity",
+              "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+              "src": "contracts/Rent2Repay.sol:54",
+              "offset": 0,
+              "slot": "4"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "tokenConfig",
+              "type": "t_mapping(t_address,t_struct(TokenConfig)1129_storage)",
+              "src": "contracts/Rent2Repay.sol:57",
+              "offset": 0,
+              "slot": "5"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "tokenList",
+              "type": "t_array(t_address)dyn_storage",
+              "src": "contracts/Rent2Repay.sol:61",
+              "offset": 0,
+              "slot": "6"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "daoFeesBPS",
+              "type": "t_uint256",
+              "src": "contracts/Rent2Repay.sol:64",
+              "offset": 0,
+              "slot": "7"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "senderTipsBPS",
+              "type": "t_uint256",
+              "src": "contracts/Rent2Repay.sol:67",
+              "offset": 0,
+              "slot": "8"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "daoFeeReductionToken",
+              "type": "t_address",
+              "src": "contracts/Rent2Repay.sol:71",
+              "offset": 0,
+              "slot": "9"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "daoFeeReductionMinimumAmount",
+              "type": "t_uint256",
+              "src": "contracts/Rent2Repay.sol:74",
+              "offset": 0,
+              "slot": "10"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "daoFeeReductionBPS",
+              "type": "t_uint256",
+              "src": "contracts/Rent2Repay.sol:77",
+              "offset": 0,
+              "slot": "11"
+            },
+            {
+              "contract": "Rent2Repay",
+              "label": "daoTreasuryAddress",
+              "type": "t_address",
+              "src": "contracts/Rent2Repay.sol:80",
+              "offset": 0,
+              "slot": "12"
+            }
+          ],
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:43",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Pausable": [
+            {
+              "contract": "PausableUpgradeable",
+              "label": "_paused",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:21",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)24_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

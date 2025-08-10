@@ -140,7 +140,8 @@ async function main() {
             deployer.address, // emergency
             deployer.address, // operator
             rmmAddress, // rmm
-            wxdaiAddress, // wxdaiToken
+            //TODO passer en tableau ?
+            wxdaiAddress, // wxdaiToken  
             armmWXDAIAddress, // wxdaiArmmToken
             usdcAddress, // usdcToken
             armmUSDCAddress // usdcArmmToken
