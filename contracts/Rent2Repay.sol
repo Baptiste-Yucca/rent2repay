@@ -197,7 +197,7 @@ contract Rent2Repay is
         address[] calldata tokens,
         uint256[] calldata amounts,
         uint256  period,
-        uint256  _timestamp
+        uint256  timestamp
     ) external whenNotPaused {
         Rent2RepayStorage storage $ = _getR2rStorage();
         uint256 len = tokens.length;
@@ -221,7 +221,7 @@ contract Rent2Repay is
         }
         
         /// @dev Initialize/activate user with timestamp (0 = inactive, !=0 = active)
-        $.lastRepayTimestamps[msg.sender] = _timestamp > 0 ? _timestamp : 1;
+        $.lastRepayTimestamps[msg.sender] = timestamp > 0 ? timestamp : 1;
         
         emit ConfiguredR2R(msg.sender);
     }

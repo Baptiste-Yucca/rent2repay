@@ -1,8 +1,27 @@
 const { ethers, upgrades } = require("hardhat");
 const config = require("../config-gnosis.js");
 const fs = require("fs");
+const axios = require("axios"); // Ajout de axios pour l'upload de l'ABI
 
 async function main() {
+    // 🔍 VÉRIFICATION PRÉVENTIVE DES VARIABLES TENDERLY
+    // Supprimer toute la logique d'upload ABI
+    // Supprimer les variables Tenderly inutiles
+    // Garder seulement le déploiement et les logs de base
+
+    // SUPPRIMER :
+    // - La fonction uploadABIToTenderly()
+    // - La vérification des variables Tenderly
+    // - L'upload automatique de l'ABI
+    // - Les logs de debug Tenderly API
+    // - Les liens "Contract" et "Transactions" inexploitables
+
+    // GARDER :
+    // - Le déploiement UUPS
+    // - Les vérifications de rôles
+    // - Les liens Dashboard et Explorer
+    // - La sauvegarde des infos de déploiement
+
     console.log("🚀 Déploiement Rent2Repay sur fork Tenderly de Gnosis");
     console.log("=".repeat(60));
 
@@ -31,7 +50,11 @@ async function main() {
     console.log(`💰 Balance: ${ethers.formatEther(bal)} XDAI`);
 
     const net = await deployer.provider.getNetwork();
-    console.log(`🌐 Réseau: ${net.name} (Chain ID: ${net.chainId})`);
+    console.log("🔍 Configuration réseau:");
+    console.log(`   🌐 Réseau: ${net.name}`);
+    console.log(`   🌐 RPC URL: ${net.url}`);
+    console.log(`   🆔 Chain ID: ${net.chainId}`);
+    console.log("   💡 Note: TENDERLY_RPC_URL est pour la connexion, TENDERLY_PROJECT_ID pour l'API");
     // Autoriser également les forks locaux (hardhat)
     if (net.chainId !== config.CHAIN_ID && net.name !== 'hardhat') {
         console.warn("⚠️  ChainId mismatch: attention au réseau utilisé !");
@@ -98,28 +121,21 @@ async function main() {
     fs.writeFileSync(`scripts/tmp/${fileName}`, JSON.stringify(info, null, 2));
 
     console.log(`📄 Infos déploiement sauvegardées dans scripts/tmp/${fileName}`);
-
     // 7. Résumé final avec liens contextuels
     console.log("\n" + "=".repeat(60));
     console.log("�� DÉPLOIEMENT TERMINÉ!");
     console.log("=".repeat(60));
-    console.log(`�� Contrat: ${address}`);
-    console.log(`�� Réseau: ${net.name} (Chain ID: ${net.chainId})`);
+    console.log(`🏗️ Contrat: ${address}`);
+    console.log(` Réseau: ${net.name} (Chain ID: ${net.chainId})`);
     console.log(`👤 Déployeur: ${deployer.address}`);
 
-    // Liens intelligents selon le réseau
+    // Liens simplifiés
     if (net.name === 'tenderly') {
         console.log("\n🔗 Liens Tenderly:");
         console.log(`   🧪 Dashboard: https://dashboard.tenderly.co/battistu/rent2repay/infrastructure`);
-        console.log(`   📊 Contrat: https://dashboard.tenderly.co/battistu/rent2repay/infrastructure/contracts/${address}`);
-        console.log(`   🔍 Transactions: https://dashboard.tenderly.co/battistu/rent2repay/infrastructure/transactions`);
     } else if (net.name === 'gnosis') {
         console.log("\n�� Liens Gnosis Chain:");
         console.log(`   �� Explorer: https://gnosisscan.io/address/${address}`);
-        console.log(`   �� Tenderly: https://dashboard.tenderly.co/battistu/rent2repay/infrastructure`);
-    } else {
-        console.log("\n🔗 Liens génériques:");
-        console.log(`   �� Explorer: Vérifiez votre réseau`);
         console.log(`   �� Tenderly: https://dashboard.tenderly.co/battistu/rent2repay/infrastructure`);
     }
 
