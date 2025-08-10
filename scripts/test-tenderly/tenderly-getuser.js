@@ -102,9 +102,13 @@ async function main() {
                 // Récupérer la periodicity pour ce token
                 const periodicity = await rent2Repay.periodicity(userAddress, token);
 
+                // Récupérer le balanceOf de l'utilisateur pour ce token
+                const tokenContract = new ethers.Contract(token, ['function balanceOf(address) view returns (uint256)'], provider);
+                const balance = await tokenContract.balanceOf(userAddress);
+
                 console.log(`   Token ${i + 1}:`);
                 console.log(`     Adresse: ${token}`);
-                console.log(`     Max Amount: ${maxAmount.toString()}`);
+                console.log(`     Max Amount: ${maxAmount.toString()} - balanceOf: ${balance.toString()} ${Number(balance) >= Number(maxAmount) ? '✅ OK' : '❌ KO'}`);
                 console.log(`     Periodicity: ${periodicity.toString()} secondes (${Math.floor(Number(periodicity) / 3600)}h ${Math.floor((Number(periodicity) % 3600) / 60)}m)`);
                 console.log(`     Last Repay: ${lastRepayTimestamp.toString()}`);
 
