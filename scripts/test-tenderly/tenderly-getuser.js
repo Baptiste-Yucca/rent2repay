@@ -8,6 +8,20 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const { ethers } = require("hardhat");
 const fs = require("fs");
 
+// Mapping des tokens avec leurs tickers et adresses supply/debt
+const TOKEN_MAPPINGS = {
+    "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d": {
+        ticker: "WXDAI",
+        supply: "0x0cA4f5554Dd9Da6217d62D8df2816c82bba4157b",
+        debt: "0x9908801dF7902675C3FEDD6Fea0294D18D5d5d34"
+    },
+    "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83": {
+        ticker: "USDC",
+        supply: "0xeD56F76E9cBC6A64b821e9c016eAFbd3db5436D1",
+        debt: "0x69c731aE5f5356a779f44C355aBB685d84e5E9e6"
+    }
+};
+
 // Remplacer cette section hardcodée :
 // const RENT2REPAY_ABI = [
 //     "function getUserConfigs(address user) external view returns (tuple(address token, uint256 allowedMaxAmount, uint256 periodicity, uint256 lastRepayTimestamp, uint256 totalRepaid, uint256 totalFeesPaid)[])"
@@ -98,6 +112,7 @@ async function main() {
             for (let i = 0; i < userConfigs.tokens.length; i++) {
                 const token = userConfigs.tokens[i];
                 const maxAmount = userConfigs.maxAmounts[i];
+                const tokenInfo = TOKEN_MAPPINGS[token] || { ticker: "UNKNOWN", supply: "N/A", debt: "N/A" };
 
                 // Récupérer la periodicity pour ce token
                 const periodicity = await rent2Repay.periodicity(userAddress, token);
@@ -106,9 +121,41 @@ async function main() {
                 const tokenContract = new ethers.Contract(token, ['function balanceOf(address) view returns (uint256)'], provider);
                 const balance = await tokenContract.balanceOf(userAddress);
 
+                // Récupérer les balances supply et debt si le token est connu
+                let supplyBalance = "N/A";
+                let debtBalance = "N/A";
+
+                if (tokenInfo.supply !== "N/A") {
+                    try {
+                        const supplyContract = new ethers.Contract(tokenInfo.supply, ['function balanceOf(address) view returns (uint256)'], provider);
+                        supplyBalance = (await supplyContract.balanceOf(userAddress)).toString();
+                    } catch (error) {
+                        supplyBalance = "Erreur";
+                    }
+                }
+
+                if (tokenInfo.debt !== "N/A") {
+                    try {
+                        const debtContract = new ethers.Contract(tokenInfo.debt, ['function balanceOf(address) view returns (uint256)'], provider);
+                        debtBalance = (await debtContract.balanceOf(userAddress)).toString();
+                    } catch (error) {
+                        debtBalance = "Erreur";
+                    }
+                }
+
                 console.log(`   Token ${i + 1}:`);
+                console.log(`     Ticker: ${tokenInfo.ticker}`);
                 console.log(`     Adresse: ${token}`);
                 console.log(`     Max Amount: ${maxAmount.toString()} - balanceOf: ${balance.toString()} ${Number(balance) >= Number(maxAmount) ? '✅ OK' : '❌ KO'}`);
+
+                if (tokenInfo.supply !== "N/A") {
+                    console.log(`     Supply Token (${tokenInfo.supply}): ${supplyBalance}`);
+                }
+
+                if (tokenInfo.debt !== "N/A") {
+                    console.log(`     Debt Token (${tokenInfo.debt}): ${debtBalance}`);
+                }
+
                 console.log(`     Periodicity: ${periodicity.toString()} secondes (${Math.floor(Number(periodicity) / 3600)}h ${Math.floor((Number(periodicity) % 3600) / 60)}m)`);
                 console.log(`     Last Repay: ${lastRepayTimestamp.toString()}`);
 

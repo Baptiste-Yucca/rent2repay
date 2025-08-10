@@ -77,28 +77,31 @@ async function main() {
         ],
         { initializer: 'initialize', kind: 'uups' }
     );
+
+    //console.log("DEBUG deployProxy return:", rent2Repay);
+    //console.log("Keys:", Object.keys(rent2Repay));
     // Pas besoin de .deployed() avec @openzeppelin/hardhat-upgrades
-    const address = await rent2Repay.getAddress();
+    const address = rent2Repay.proxyContract.target; //await rent2Repay.getAddress();
     console.log(`✅ Proxy déployé à: ${address} `);
 
     // 4. Configurer les setters
     console.log("\n⚙️ Configuration des paramètres post-initialization");
-    const tx1 = await rent2Repay.updateDaoTreasuryAddress(config.DAO_TREASURY_ADDRESS);
+    const tx1 = await rent2Repay.proxyContract.updateDaoTreasuryAddress(config.DAO_TREASURY_ADDRESS);
     await tx1.wait();
     console.log("✔ Treasury address mise à jour");
 
     if (config.DAO_FEE_REDUCTION_TOKEN && !config.DAO_FEE_REDUCTION_TOKEN.includes('0000')) {
-        const tx2 = await rent2Repay.updateDaoFeeReductionToken(config.DAO_FEE_REDUCTION_TOKEN);
+        const tx2 = await rent2Repay.proxyContract.updateDaoFeeReductionToken(config.DAO_FEE_REDUCTION_TOKEN);
         await tx2.wait();
         console.log("✔ Fee reduction token configuré");
     }
 
     // 5. Vérifications
     console.log("\n🔍 Vérification des rôles et adresses");
-    console.log(`RMM: ${await rent2Repay.rmm()} `);
-    console.log(`Admin role: ${await rent2Repay.hasRole(await rent2Repay.ADMIN_ROLE(), config.ADMIN_ADDRESS)} `);
-    console.log(`Emergency role: ${await rent2Repay.hasRole(await rent2Repay.EMERGENCY_ROLE(), config.EMERGENCY_ADDRESS)} `);
-    console.log(`Operator role: ${await rent2Repay.hasRole(await rent2Repay.OPERATOR_ROLE(), config.OPERATOR_ADDRESS)} `);
+    console.log(`RMM: ${await rent2Repay.proxyContract.rmm()} `);
+    console.log(`Admin role: ${await rent2Repay.proxyContract.hasRole(await rent2Repay.proxyContract.ADMIN_ROLE(), config.ADMIN_ADDRESS)} `);
+    console.log(`Emergency role: ${await rent2Repay.proxyContract.hasRole(await rent2Repay.proxyContract.EMERGENCY_ROLE(), config.EMERGENCY_ADDRESS)} `);
+    console.log(`Operator role: ${await rent2Repay.proxyContract.hasRole(await rent2Repay.proxyContract.OPERATOR_ROLE(), config.OPERATOR_ADDRESS)} `);
 
     // 6. Sauvegarde des infos
     const info = {

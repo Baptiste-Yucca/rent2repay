@@ -26,6 +26,7 @@
     "check:debt": "npx hardhat run scripts/check-debt-balances.js --network localhost",
     "whois": "npx hardhat run scripts/whois.js --network localhost",
     "deploy:tenderly": "npx hardhat run scripts/deploy-tenderly.js --network tenderly",
+    "deploy:tenderly:verified": "npx hardhat run scripts/deploy-tenderly-verified.js --network tenderly",
     "deploy:gnosis": "npx hardhat run scripts/deploy-tenderly.js --network gnosis",
     "check:tenderly": "npx hardhat run scripts/check-tenderly.js --network tenderly"
   },
@@ -40,7 +41,7 @@
     "@openzeppelin/hardhat-upgrades": "^3.9.0",
     "@tenderly/hardhat-tenderly": "^2.5.2",
     "dotenv": "^16.5.0",
-    "hardhat": "^2.24.0",
+    "hardhat": "^2.22.0",
     "prettier": "^3.5.3",
     "prettier-plugin-solidity": "^2.0.0",
     "solhint": "^5.1.0",

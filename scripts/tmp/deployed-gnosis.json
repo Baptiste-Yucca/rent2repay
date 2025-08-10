@@ -19,6 +19,6 @@
   "DAO_FEE_REDUCTION_MINIMUM_AMOUNT": "1000000000000000000",
   "CHAIN_ID": 100,
   "RPC_URL": "https://rpc.gnosischain.com",
-  "TENDERLY_RPC_URL": "https://virtual.gnosis.eu.rpc.tenderly.co/949b74bb-02c1-4db4-8a25-8d3aaf24c8a3",
+  "TENDERLY_RPC_URL": "https://virtual.gnosis.eu.rpc.tenderly.co/aa9b1a38-74f1-473b-b8c2-77e00cfe0b79",
   "deployedAt": "2025-08-10T04:58:05.784Z"
 }

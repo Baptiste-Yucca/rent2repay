@@ -57,7 +57,7 @@ module.exports = {
     RPC_URL: "https://rpc.gnosischain.com", // RPC public Gnosis
 
     // URL RPC Tenderly (optionnel - pour les tests)
-    TENDERLY_RPC_URL: "https://virtual.gnosis.eu.rpc.tenderly.co/949b74bb-02c1-4db4-8a25-8d3aaf24c8a3", // URL RPC Tenderly si disponible
+    TENDERLY_RPC_URL: "https://virtual.gnosis.eu.rpc.tenderly.co/aa9b1a38-74f1-473b-b8c2-77e00cfe0b79", // URL RPC Tenderly si disponible
 };
 
 /**
