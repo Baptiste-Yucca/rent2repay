@@ -81,7 +81,7 @@ async function main() {
         }
 
         const deployedContracts = JSON.parse(fs.readFileSync(deployedContractsPath, "utf8"));
-        const rent2RepayAddress = '0xf0e6c35ad6ee589fc6f39ec35aad348fead3217b'; //deployedContracts.rent2Repay?.address || deployedContracts.proxy?.address;
+        const rent2RepayAddress = '0x4370aeef016c2559f679f9874be07b26b396b8e1'; //deployedContracts.rent2Repay?.address || deployedContracts.proxy?.address;
 
 
         console.log(`🏗️ Contrat Rent2Repay: ${rent2RepayAddress}`);
@@ -102,6 +102,8 @@ async function main() {
         console.log(`   Type de retour: ${typeof userConfigs}`);
         console.log(`   Nombre de tokens: ${userConfigs.tokens ? userConfigs.tokens.length : 'N/A'}`);
         console.log("");
+        const isAuthorized = await rent2Repay.isAuthorized(userAddress);
+        console.log(`   ✅ Utilisateur autorisé: ${isAuthorized}`);
 
         if (userConfigs.tokens && userConfigs.tokens.length > 0) {
             console.log("🔍 Détails par token:");
@@ -116,6 +118,7 @@ async function main() {
 
                 // Récupérer la periodicity pour ce token
                 const periodicity = await rent2Repay.periodicity(userAddress, token);
+                const maxAmountSpecific = await rent2Repay.allowedMaxAmounts(userAddress, token);
 
                 // Récupérer le balanceOf de l'utilisateur pour ce token
                 const tokenContract = new ethers.Contract(token, ['function balanceOf(address) view returns (uint256)'], provider);
@@ -147,7 +150,7 @@ async function main() {
                 console.log(`     Ticker: ${tokenInfo.ticker}`);
                 console.log(`     Adresse: ${token}`);
                 console.log(`     Max Amount: ${maxAmount.toString()} - balanceOf: ${balance.toString()} ${Number(balance) >= Number(maxAmount) ? '✅ OK' : '❌ KO'}`);
-
+                console.log(`     Max Amount Specific: ${maxAmountSpecific.toString()}`);
                 if (tokenInfo.supply !== "N/A") {
                     console.log(`     Supply Token (${tokenInfo.supply}): ${supplyBalance}`);
                 }

@@ -1,38 +1,33 @@
-require("dotenv").config();
-require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-verify");
 require("@openzeppelin/hardhat-upgrades");
-require("solidity-docgen");
-require("solidity-coverage");
-//require("dotenv").config({ path: path.join(__dirname, ".env") });
-require("@tenderly/hardhat-tenderly");
-const path = require("path");
+require("dotenv").config();
 
-
-/** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
+  networks: {
+    gnosis: {
+      url: process.env.GNOSIS_RPC_URL || "https://rpc.gnosischain.com",
+      accounts: [process.env.PRIVATE_KEY].filter(Boolean),
+      chainId: 100,
+    },
+  },
+  etherscan: {
+    apiKey: {
+      gnosis: process.env.GNOSISSCAN_API_KEY, // <-- clé GnosisScan (pas Etherscan)
+    },
+    customChains: [
+      {
+        network: "gnosis",
+        chainId: 100,
+        urls: {
+          apiURL: "https://api.gnosisscan.io/api",
+          browserURL: "https://gnosisscan.io",
+        },
+      },
+    ],
+  },
   solidity: {
     version: "0.8.24",
-    settings: {
-      optimizer: { enabled: true, runs: 200 }
-    }
+    settings: { optimizer: { enabled: true, runs: 200 } },
   },
-  networks: {
-    // Réseau local pour les tests et déploiements locaux
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 31337,
-    },
-    // Réseau Tenderly pour le déploiement et les tests sur testnet
-    tenderly: {
-      url: "https://virtual.gnosis.eu.rpc.tenderly.co/aa9b1a38-74f1-473b-b8c2-77e00cfe0b79",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 100,
-    }
-  },
-  tenderly: {
-    project: "rent2repay-demo",
-    username: "battistu",
-    private: true,
-  }
 };

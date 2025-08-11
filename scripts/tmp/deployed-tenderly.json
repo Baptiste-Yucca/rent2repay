@@ -2,7 +2,7 @@
   "network": "tenderly",
   "chainId": "100",
   "deployer": "0xD2f9d86f58E8871c6D97DCc2BF911efB98a4c97C",
-  "rent2Repay": "0x92E460E2ee3d420E4E9569454ea98f8f7cFDe97D",
+  "rent2Repay": "0x4370aeeF016c2559F679f9874BE07B26B396b8e1",
   "RMM_ADDRESS": "0xFb9b496519fCa8473fba1af0850B6B8F476BFdB3",
   "WXDAI_TOKEN": "0xe91d153e0b41518a2ce8dd3d7944fa863463a97d",
   "USDC_TOKEN": "0xddafbb505ad214d7b80b1f830fccc89b60fb7a83",
@@ -20,5 +20,5 @@
   "CHAIN_ID": 100,
   "RPC_URL": "https://rpc.gnosischain.com",
   "TENDERLY_RPC_URL": "https://virtual.gnosis.eu.rpc.tenderly.co/aa9b1a38-74f1-473b-b8c2-77e00cfe0b79",
-  "deployedAt": "2025-08-10T18:19:04.169Z"
+  "deployedAt": "2025-08-11T19:20:39.424Z"
 }
