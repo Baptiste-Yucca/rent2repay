@@ -1,8 +1,14 @@
-# Hardhat files
+# Foundry files
+out/
+cache/
+broadcast/
+
+# Hardhat files (à garder pour compatibilité)
 cache
 artifacts
 typechain
 typechain-types
+
 
 src_RMM/*
 

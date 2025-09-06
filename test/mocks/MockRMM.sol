@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/IRMM.sol";
-import "hardhat/console.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IRMM} from "interfaces/IRMM.sol";
 
 /**
  * @title MockRMM
@@ -145,5 +144,4 @@ contract MockRMM is IRMM {
     function getDebtToken(address token) external view returns (address) {
         return tokenToDebtToken[token];
     }
-
 }

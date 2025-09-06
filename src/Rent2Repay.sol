@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/IRMM.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IRMM} from "interfaces/IRMM.sol";
 
 /**
  * @title Rent2Repay
@@ -61,10 +61,10 @@ contract Rent2Repay is
         address[] tokenList;
 
         /// @notice DAO fees in basis points (BPS) - 10000 = 100%
-        uint256 daoFeesBPS;
+        uint256 daoFeesBps;
         
         /// @notice Sender tips in basis points (BPS) - 10000 = 100%
-        uint256 senderTipsBPS;
+        uint256 senderTipsBps;
 
         /// @notice Token address for DAO fee reduction - if user holds this token above minimum 
         /// amount, DAO fees are reduced
@@ -74,7 +74,7 @@ contract Rent2Repay is
         uint256 daoFeeReductionMinimumAmount;
 
         /// @notice DAO fee reduction percentage in basis points (BPS) - 10000 = 100% 
-        uint256 daoFeeReductionBPS;
+        uint256 daoFeeReductionBps;
 
         /// @notice DAO treasury address that receives DAO fees
         address daoTreasuryAddress;
@@ -151,9 +151,9 @@ contract Rent2Repay is
         $.rmm = IRMM(_rmm);
         
         /// @dev Initialize default fee values
-        $.daoFeesBPS = 50; /// @dev 0.5% default
-        $.senderTipsBPS = 25; /// @dev 0.25% default
-        $.daoFeeReductionBPS = 5000; /// @dev 50% default
+        $.daoFeesBps = 50; /// @dev 0.5% default
+        $.senderTipsBps = 25; /// @dev 0.25% default
+        $.daoFeeReductionBps = 5000; /// @dev 50% default
         $.defaultInterestRateMode = 2; /// @dev Default interest rate mode (2 = Variable rate)
         
         /// @dev Initialize with WXDAI and USDC as authorized token pairs
@@ -617,14 +617,14 @@ contract Rent2Repay is
     ) {
         Rent2RepayStorage storage $ = _getR2rStorage();
         /// @dev Calculate base fees
-        daoFees = (amount * $.daoFeesBPS) / 10000;
-        senderTips = (amount * $.senderTipsBPS) / 10000;
+        daoFees = (amount * $.daoFeesBps) / 10000;
+        senderTips = (amount * $.senderTipsBps) / 10000;
 
         if ($.daoFeeReductionToken != address(0) && $.daoFeeReductionMinimumAmount > 0) {
             uint256 userBalance = IERC20($.daoFeeReductionToken).balanceOf(user);
             if (userBalance >= $.daoFeeReductionMinimumAmount) {
                 /// @dev Reduce DAO fees by the configured percentage (BPS)
-                uint256 reductionAmount = (daoFees * $.daoFeeReductionBPS) / 10000;
+                uint256 reductionAmount = (daoFees * $.daoFeeReductionBps) / 10000;
                 daoFees = daoFees - reductionAmount;
             }
         }
@@ -648,7 +648,7 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        IERC20(token).transfer(to, amount);
+        require(IERC20(token).transfer(to, amount), "Transfer failed");
     }
 
     /**
@@ -660,8 +660,8 @@ contract Rent2Repay is
         onlyRole(ADMIN_ROLE) 
     {
         Rent2RepayStorage storage $ = _getR2rStorage();
-        if (newFeesBPS + $.senderTipsBPS > 10000) revert InvalidFeesBPS();
-        $.daoFeesBPS = newFeesBPS;
+        if (newFeesBPS + $.senderTipsBps > 10000) revert InvalidFeesBPS();
+        $.daoFeesBps = newFeesBPS;
     }
 
     /**
@@ -673,8 +673,8 @@ contract Rent2Repay is
         onlyRole(ADMIN_ROLE) 
     {
         Rent2RepayStorage storage $ = _getR2rStorage();
-        if ($.daoFeesBPS + newTipsBPS > 10000) revert InvalidTipsBPS();
-        $.senderTipsBPS = newTipsBPS;
+        if ($.daoFeesBps + newTipsBPS > 10000) revert InvalidTipsBPS();
+        $.senderTipsBps = newTipsBPS;
     }
 
     /**
@@ -688,7 +688,7 @@ contract Rent2Repay is
         returns (uint256 daoFees, uint256 senderTips) 
     {
         Rent2RepayStorage storage $ = _getR2rStorage();
-        return ($.daoFeesBPS, $.senderTipsBPS);
+        return ($.daoFeesBps, $.senderTipsBps);
     }
 
     /**
@@ -712,7 +712,7 @@ contract Rent2Repay is
         return (
             $.daoFeeReductionToken, 
             $.daoFeeReductionMinimumAmount, 
-            $.daoFeeReductionBPS, 
+            $.daoFeeReductionBps, 
             $.daoTreasuryAddress
         );
     }
@@ -751,7 +751,7 @@ contract Rent2Repay is
         onlyRole(ADMIN_ROLE) 
     {
         Rent2RepayStorage storage $ = _getR2rStorage();
-        $.daoFeeReductionBPS = newPercentage;
+        $.daoFeeReductionBps = newPercentage;
     }
 
     /**
@@ -858,12 +858,12 @@ contract Rent2Repay is
         return _getR2rStorage().tokenList[index];
     }
 
-    function daoFeesBPS() external view returns (uint256) {
-        return _getR2rStorage().daoFeesBPS;
+    function daoFeesBps() external view returns (uint256) {
+        return _getR2rStorage().daoFeesBps;
     }
 
-    function senderTipsBPS() external view returns (uint256) {
-        return _getR2rStorage().senderTipsBPS;
+    function senderTipsBps() external view returns (uint256) {
+        return _getR2rStorage().senderTipsBps;
     }
 
     function daoFeeReductionToken() external view returns (address) {
@@ -874,8 +874,8 @@ contract Rent2Repay is
         return _getR2rStorage().daoFeeReductionMinimumAmount;
     }
 
-    function daoFeeReductionBPS() external view returns (uint256) {
-        return _getR2rStorage().daoFeeReductionBPS;
+    function daoFeeReductionBps() external view returns (uint256) {
+        return _getR2rStorage().daoFeeReductionBps;
     }
 
     function daoTreasuryAddress() external view returns (address) {
