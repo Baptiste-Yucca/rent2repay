@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Rent2Repay} from "../src/Rent2Repay.sol";
 import {MockRMM} from "./mocks/MockRMM.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract Rent2RepayTest is Test {
     Rent2Repay public rent2Repay;
@@ -36,7 +37,7 @@ contract Rent2RepayTest is Test {
         tokens[1] = address(usdc);
         
         address[] memory debtTokens = new address[](2);
-        debtTokens[0] = address(wxdaiDebt);  // Il faut créer ces debt tokens
+        debtTokens[0] = address(wxdaiDebt);
         debtTokens[1] = address(usdcDebt);
         
         address[] memory supplyTokens = new address[](2);
@@ -45,11 +46,12 @@ contract Rent2RepayTest is Test {
         
         mockRMM = new MockRMM(tokens, debtTokens, supplyTokens);
         
-        // Deploy Rent2Repay
-        rent2Repay = new Rent2Repay();
+        // 1. Deploy l'implémentation
+        Rent2Repay implementation = new Rent2Repay();
         
-        // Initialize
-        rent2Repay.initialize(
+        // 2. Préparer les données d'initialisation
+        bytes memory initData = abi.encodeWithSelector(
+            Rent2Repay.initialize.selector,
             admin,
             emergency,
             operator,
@@ -59,6 +61,10 @@ contract Rent2RepayTest is Test {
             address(usdc),
             address(usdcSupply)
         );
+        
+        // 3. Deploy le proxy avec l'implémentation
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        rent2Repay = Rent2Repay(address(proxy));
         
         // Setup user with tokens
         wxdai.mint(user, 1000 ether);
