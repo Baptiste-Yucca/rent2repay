@@ -280,7 +280,7 @@ contract Rent2Repay is
      */
     function _validateUserAndToken(address user, address token) internal view {
         Rent2RepayStorage storage $ = _getR2rStorage();
-        require($.lastRepayTimestamps[user] == 0, "User not authorized");
+        require($.lastRepayTimestamps[user] != 0, "User not authorized");
         require($.allowedMaxAmounts[user][token] > 0, "User not configured for token");
         require($.periodicity[user][token] > 0, "Periodicity not set");
         require(_isNewPeriod(user, token), "Wait next period");
