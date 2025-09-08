@@ -829,7 +829,7 @@ contract Rent2Repay is
      * @notice Returns the version of the contract
      * @return Version string
      */
-    function version() external pure returns (string memory) {
+    function version() external pure virtual returns (string memory) {
         return "1.0.0";
     }
 

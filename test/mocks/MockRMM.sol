@@ -99,16 +99,12 @@ contract MockRMM is IRMM {
         // Récupérer le token de dette correspondant
         address debtToken = tokenToDebtToken[asset];
         
-        // Calculer le montant réellement remboursé selon le mode
+        // Calculer le montant réellement remboursé selon le mode (pas interestRateMode)
         uint256 actualRepaidAmount;
         if (mode == 1) {
             // Mode 1: soustraire 100 wei pour simuler une différence
             require(amount > 100, "Amount must be greater than 100 wei in mode 1");
             actualRepaidAmount = amount - 100;
-        } else if (mode == 2) {
-            // Mode 2: soustraire la différence personnalisée
-            require(amount > customDifference, "Amount must be greater than custom difference in mode 2");
-            actualRepaidAmount = amount - customDifference;
         } else {
             // Mode 0: fonctionnement normal
             actualRepaidAmount = amount;
@@ -116,10 +112,16 @@ contract MockRMM is IRMM {
         
         // Simuler le remboursement en transférant les debt tokens vers l'adresse 0
         // (équivalent à les brûler) - on brûle le montant réellement remboursé
+        if(IERC20(debtToken).balanceOf(onBehalfOf) < actualRepaidAmount) {
+            revert("Insufficient balance");
+        }
         require(IERC20(debtToken).transferFrom(onBehalfOf, address(0x000000000000000000000000000000000000dEaD), actualRepaidAmount), "Transfer from failed");
         
         // Transférer les tokens de remboursement vers ce contrat (simulation)
         // Le contrat reçoit le montant total demandé
+        if(IERC20(asset).balanceOf(msg.sender) < amount) {
+            revert("Insufficient balance");
+        }
         require(IERC20(asset).transferFrom(msg.sender, address(0x000000000000000000000000000000000000dEaD), amount), "Transfer from failed");
         
         emit Repaid(asset, actualRepaidAmount, interestRateMode, onBehalfOf);

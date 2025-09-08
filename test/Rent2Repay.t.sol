@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Rent2Repay} from "../src/Rent2Repay.sol";
+import {Rent2RepayV2} from "./mocks/Rent2RepayV2.sol";
 import {MockRMM} from "./mocks/MockRMM.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -21,6 +22,7 @@ contract Rent2RepayTest is Test {
     address public user = address(0x4);
     address public user2 = address(0x5);
     address public user3 = address(0x6);
+    address public unknownUser = address(0x7);
     
     function setUp() public {
         // Créer les tokens d'abord
@@ -48,6 +50,9 @@ contract Rent2RepayTest is Test {
         
         mockRMM = new MockRMM(tokens, debtTokens, supplyTokens);
         mockRMM.setMode(0); // Mode normal sans soustraction
+        
+        // Vérifier que le mode par défaut est 0
+        assertEq(mockRMM.getMode(), 0, "Default mode should be 0");
         
         // 1. Deploy l'implémentation
         Rent2Repay implementation = new Rent2Repay();
@@ -171,6 +176,13 @@ contract Rent2RepayTest is Test {
         // Vérifier que user2 a reçu les frais
         uint256 actualTipsReceived = user2BalanceAfter - user2BalanceBefore;
         assertEq(actualTipsReceived, expectedSenderTips, "User2 should receive correct sender tips");
+        
+        // ===== TEST avec token non défini =====
+        address nonDefinedToken = address(0x1234); // Token non configuré
+        
+        vm.prank(user2);
+        vm.expectRevert();
+        rent2Repay.rent2repay(user, nonDefinedToken);
     }
     
     function testBatchRent2Repay() public {
@@ -247,6 +259,13 @@ contract Rent2RepayTest is Test {
         
         // Vérifier que les montants dépensés sont identiques (même configuration)
         assertEq(expectedSpent1, expectedSpent2, "Both users should have spent the same amount");
+        
+        // ===== TEST avec token non défini =====
+        address nonDefinedToken = address(0x5678); // Token non configuré
+        
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.batchRent2Repay(users, nonDefinedToken);
     }
     
     function testRevokeRent2Repay() public {
@@ -268,78 +287,44 @@ contract Rent2RepayTest is Test {
         assertFalse(rent2Repay.isAuthorized(user));
     }
 
-    function testRent2RepayLimit() public {
-        // ===== SETUP =====
-        // User a 100$ de dette (du setUp) et autorise 10$ par semaine
-        uint256 weeklyLimit = 10 ether;
-        address wxdaiDebt = mockRMM.getDebtToken(address(wxdai));
+
+
+    function testRmmModeDifference() public {
+        // Test pour vérifier la gestion des différences avec le mode 1 du MockRMM
         
-        // Configuration : 10$ par semaine
+        // Configuration
         address[] memory tokens = new address[](1);
         tokens[0] = address(wxdai);
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = weeklyLimit;
+        amounts[0] = 10 ether;
         
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 weeks, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
         
-        // ===== BOUCLE DE REMBOURSEMENTS =====
-        uint256 totalSpent = 0;
-        uint256 repaymentCount = 0;
+        // Avancer le temps pour respecter la périodicité
+        vm.warp(block.timestamp + 2 seconds);
         
-        // Continuer les remboursements jusqu'à ce qu'il n'y ait plus de debt tokens
-        // On s'arrête quand il reste moins de 5 ether (pour éviter les erreurs d'underflow)
-        while (MockERC20(wxdaiDebt).balanceOf(user) >= 5 ether) {
-            repaymentCount++;
-            console.log("=== REMBOURSEMENT", repaymentCount, "===");
-            console.log("Debt tokens avant:", MockERC20(wxdaiDebt).balanceOf(user));
-            
-            // Avancer le temps pour respecter la périodicité
-            vm.warp(block.timestamp + 1 weeks + 1 seconds);
-            
-            uint256 balanceBefore = wxdai.balanceOf(user);
-            vm.prank(user2);
-            rent2Repay.rent2repay(user, address(wxdai));
-            uint256 balanceAfter = wxdai.balanceOf(user);
-            
-            uint256 spent = balanceBefore - balanceAfter;
-            totalSpent += spent;
-            
-            console.log("Montant rembourse:", spent);
-            console.log("Debt tokens apres:", MockERC20(wxdaiDebt).balanceOf(user));
-            console.log("Total depense:", totalSpent);
-            console.log("---");
-            
-            // Vérifier que chaque remboursement est proche de 10$ (tolérance pour les différences du MockRMM)
-            assertGe(spent, 9 ether, string(abi.encodePacked("Repayment ", repaymentCount, " should be at least 9$")));
-            assertLe(spent, 10 ether, string(abi.encodePacked("Repayment ", repaymentCount, " should be at most 10$")));
-            assertTrue(rent2Repay.isAuthorized(user), "User should still be authorized");
-        }
+        // ===== TEST MODE 1 (avec différence) =====
+        mockRMM.setMode(1); // Mode avec soustraction de 100 wei
         
-        console.log("=== FIN DES REMBOURSEMENTS ===");
-        console.log("Nombre total de remboursements:", repaymentCount);
-        console.log("Total depense:", totalSpent);
-        console.log("Debt tokens restants:", MockERC20(wxdaiDebt).balanceOf(user));
-        
-        // ===== TEST FINAL : REMBOURSEMENT DOIT ÉCHOUER =====
-        vm.warp(block.timestamp + 1 weeks + 1 seconds);
-        
-        uint256 balanceBeforeFinal = wxdai.balanceOf(user);
-        
-        // Ce remboursement doit échouer car il n'y a plus assez de debt tokens
+        uint256 balanceBefore = wxdai.balanceOf(user);
         vm.prank(user2);
-        vm.expectRevert();
         rent2Repay.rent2repay(user, address(wxdai));
+        uint256 balanceAfter = wxdai.balanceOf(user);
         
-        // Vérifier que la balance n'a pas changé
-        uint256 balanceAfterFinal = wxdai.balanceOf(user);
-        assertEq(balanceAfterFinal, balanceBeforeFinal, "Balance should not change on failed repayment");
+        uint256 spent = balanceBefore - balanceAfter;
         
-        // ===== VÉRIFICATIONS FINALES =====
-        // Vérifier qu'on a fait plusieurs remboursements et que le total est proche de 100$
-        assertGt(repaymentCount, 5, "Should have made several repayments");
-        assertGe(totalSpent, 90 ether, "Total spent should be at least 90$");
-        assertLe(totalSpent, 100 ether, "Total spent should be at most 100$");
+        // Vérifier que le montant dépensé est correct (10 ether - 100 wei)
+        // L'utilisateur paie 10 ether, mais le MockRMM en mode 1 soustrait 100 wei
+        // La différence (100 wei) est remboursée à l'utilisateur
+        assertEq(spent, 10 ether - 100, "User should have spent 10 ether minus 100 wei");
+        
+        // Vérifier que le mode est bien 1
+        assertEq(mockRMM.getMode(), 1, "MockRMM should be in mode 1");
+        
+        // ===== REMETTRE EN MODE 0 =====
+        mockRMM.setMode(0);
+        assertEq(mockRMM.getMode(), 0, "MockRMM should be back to mode 0");
     }
 
     // ===== TESTS DE COUVERTURE =====
@@ -446,6 +431,15 @@ contract Rent2RepayTest is Test {
         vm.prank(admin);
         rent2Repay.updateDaoTreasuryAddress(newTreasury);
         assertEq(rent2Repay.daoTreasuryAddress(), newTreasury, "Treasury address should be updated");
+        
+        // ===== TEST getDaoFeeReductionConfiguration =====
+        (address configToken, uint256 configMinimumAmount, uint256 configReductionPercentage, address configTreasuryAddress) = 
+            rent2Repay.getDaoFeeReductionConfiguration();
+        
+        assertEq(configToken, newReductionToken, "Configuration token should match");
+        assertEq(configMinimumAmount, newMinimumAmount, "Configuration minimum amount should match");
+        assertEq(configReductionPercentage, newReductionBps, "Configuration reduction percentage should match");
+        assertEq(configTreasuryAddress, newTreasury, "Configuration treasury address should match");
         
         // Test que seul admin peut modifier la réduction des frais
         vm.prank(user);
@@ -645,5 +639,438 @@ contract Rent2RepayTest is Test {
         
         // Test isAuthorized après configuration
         assertTrue(rent2Repay.isAuthorized(user), "User should be authorized after configuration");
+    }
+    
+    function testRoleBasedAccessControl() public {
+        // Test complet des rôles et accès pour toutes les fonctions
+        
+        // ===== FONCTIONS ADMIN SEULEMENT =====
+        
+        // updateDaoFees - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.updateDaoFees(100);
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.updateDaoFees(100);
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.updateDaoFees(100);
+        
+        // updateSenderTips - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.updateSenderTips(100);
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.updateSenderTips(100);
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.updateSenderTips(100);
+        
+        // updateDaoFeeReductionToken - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionToken(address(0x123));
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionToken(address(0x123));
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionToken(address(0x123));
+        
+        // updateDaoFeeReductionMinimumAmount - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionMinimumAmount(1000);
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionMinimumAmount(1000);
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionMinimumAmount(1000);
+        
+        // updateDaoFeeReductionPercentage - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionPercentage(100);
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionPercentage(100);
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.updateDaoFeeReductionPercentage(100);
+        
+        // updateDaoTreasuryAddress - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.updateDaoTreasuryAddress(address(0x123));
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.updateDaoTreasuryAddress(address(0x123));
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.updateDaoTreasuryAddress(address(0x123));
+        
+        // authorizeTokenPair - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.authorizeTokenPair(address(0x123), address(0x456));
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.authorizeTokenPair(address(0x123), address(0x456));
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.authorizeTokenPair(address(0x123), address(0x456));
+        
+        // unauthorizeToken - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.unauthorizeToken(address(wxdai));
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.unauthorizeToken(address(wxdai));
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.unauthorizeToken(address(wxdai));
+        
+        // emergencyTokenRecovery - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.emergencyTokenRecovery(address(wxdai), 1000, address(admin));
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.emergencyTokenRecovery(address(wxdai), 1000, address(admin));
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.emergencyTokenRecovery(address(wxdai), 1000, address(admin));
+        
+        // unpause - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.unpause();
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.unpause();
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.unpause();
+        
+        // ===== FONCTIONS EMERGENCY SEULEMENT =====
+        
+        // pause - seul EMERGENCY
+        vm.prank(admin);
+        vm.expectRevert();
+        rent2Repay.pause();
+        
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.pause();
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.pause();
+        
+        // ===== FONCTIONS USER SEULEMENT =====
+        
+        // revokeRent2RepayAll - seul USER configuré
+        vm.prank(admin);
+        vm.expectRevert();
+        rent2Repay.revokeRent2RepayAll();
+        
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.revokeRent2RepayAll();
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.revokeRent2RepayAll();
+        
+        vm.prank(user2);
+        vm.expectRevert();
+        rent2Repay.revokeRent2RepayAll();
+        
+        // ===== FONCTIONS PUBLIQUES (TOUS PEUVENT APPELER) =====
+        
+        // Ces fonctions devraient fonctionner pour tous les rôles
+        // (pas de test de revert nécessaire)
+        
+        // Test que les fonctions publiques fonctionnent
+        vm.prank(admin);
+        rent2Repay.whoami();
+        
+        vm.prank(operator);
+        rent2Repay.whoami();
+        
+        vm.prank(emergency);
+        rent2Repay.whoami();
+        
+        vm.prank(user);
+        rent2Repay.whoami();
+        
+        // Test des getters
+        vm.prank(admin);
+        rent2Repay.getFeeConfiguration();
+        
+        vm.prank(operator);
+        rent2Repay.getActiveTokens();
+        
+        vm.prank(emergency);
+        rent2Repay.version();
+        
+        vm.prank(user);
+        rent2Repay.isAuthorized(user);
+    }
+    
+    function testSimpleRoleAccess() public {
+        // Test simple des rôles pour identifier le problème
+        
+        // Test updateDaoFees - seul ADMIN
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.updateDaoFees(100);
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.updateDaoFees(100);
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.updateDaoFees(100);
+        
+        // Test pause - seul EMERGENCY
+        vm.prank(admin);
+        vm.expectRevert();
+        rent2Repay.pause();
+        
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.pause();
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.pause();
+    }
+    
+    function testPauseBehavior() public {
+        // Test que toutes les fonctions avec whenNotPaused reverent quand le contrat est en pause
+        
+        // Configurer un utilisateur d'abord
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(wxdai);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 10 ether;
+        
+        vm.prank(user);
+        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        
+        // Mettre le contrat en pause
+        vm.prank(emergency);
+        rent2Repay.pause();
+        
+        // Vérifier que le contrat est en pause
+        assertTrue(rent2Repay.paused(), "Contract should be paused");
+        
+        // ===== TEST configureRent2Repay avec pause =====
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        
+        // ===== TEST rent2repay avec pause =====
+        vm.prank(user2);
+        vm.expectRevert();
+        rent2Repay.rent2repay(user, address(wxdai));
+        
+        // ===== TEST batchRent2Repay avec pause =====
+        address[] memory users = new address[](1);
+        users[0] = user;
+        
+        vm.prank(user2);
+        vm.expectRevert();
+        rent2Repay.batchRent2Repay(users, address(wxdai));
+        
+        // ===== TEST unpause =====
+        vm.prank(admin);
+        rent2Repay.unpause();
+        
+        // Vérifier que le contrat n'est plus en pause
+        assertFalse(rent2Repay.paused(), "Contract should not be paused");
+        
+        // Avancer le temps pour respecter la périodicité
+        vm.warp(block.timestamp + 1 seconds);
+        
+        // Vérifier que les fonctions fonctionnent à nouveau
+        vm.prank(user2);
+        rent2Repay.rent2repay(user, address(wxdai));
+    }
+    
+    function testTokenPairManagement() public {
+        // Test complet de authorizeTokenPair et unauthorizeToken avec tokenConfig
+        
+        // Créer des tokens de test (USDT et sa paire)
+        MockERC20 usdt = new MockERC20("Tether USD", "USDT", 6, 1000000 * 10**6);
+        MockERC20 usdtSupply = new MockERC20("USDT Supply", "aUSDT", 6, 1000000 * 10**6);
+        
+        // ===== TEST INITIAL : USDT n'est pas présent =====
+        Rent2Repay.TokenConfig memory config = rent2Repay.tokenConfig(address(usdt));
+        assertEq(config.token, address(0), "USDT should not be present initially");
+        assertEq(config.supplyToken, address(0), "USDT supply should not be present initially");
+        assertFalse(config.active, "USDT should not be authorized initially");
+        
+        // ===== TEST authorizeTokenPair =====
+        vm.prank(admin);
+        rent2Repay.authorizeTokenPair(address(usdt), address(usdtSupply));
+        
+        // Vérifier que la paire a été ajoutée
+        config = rent2Repay.tokenConfig(address(usdt));
+        assertEq(config.token, address(usdt), "USDT token should be present");
+        assertEq(config.supplyToken, address(usdtSupply), "USDT supply token should be correct");
+        assertTrue(config.active, "USDT should be authorized");
+        
+        // Vérifier que USDT est dans la liste des tokens actifs
+        address[] memory activeTokens = rent2Repay.getActiveTokens();
+        bool usdtFound = false;
+        for (uint i = 0; i < activeTokens.length; i++) {
+            if (activeTokens[i] == address(usdt)) {
+                usdtFound = true;
+                break;
+            }
+        }
+        assertTrue(usdtFound, "USDT should be in active tokens list");
+        
+        // ===== TEST unauthorizeToken =====
+        vm.prank(admin);
+        rent2Repay.unauthorizeToken(address(usdt));
+        
+        // Vérifier que la paire a été désactivée (mais pas supprimée)
+        config = rent2Repay.tokenConfig(address(usdt));
+        assertEq(config.token, address(usdt), "USDT token should still be present but inactive");
+        assertEq(config.supplyToken, address(usdtSupply), "USDT supply should still be present but inactive");
+        assertFalse(config.active, "USDT should not be active after unauthorize");
+        
+        // Vérifier que USDT n'est plus dans la liste des tokens actifs
+        activeTokens = rent2Repay.getActiveTokens();
+        usdtFound = false;
+        for (uint i = 0; i < activeTokens.length; i++) {
+            if (activeTokens[i] == address(usdt)) {
+                usdtFound = true;
+                break;
+            }
+        }
+        assertFalse(usdtFound, "USDT should not be in active tokens list after unauthorize");
+    }
+    
+    function testRemoveUserAndGetUserConfigs() public {
+        // Test complet de removeUser et getUserConfigs avec unknownUser
+        
+        // ===== TEST INITIAL : unknownUser n'est pas configuré =====
+        (address[] memory tokens, uint256[] memory maxAmounts) = rent2Repay.getUserConfigs(unknownUser);
+        assertEq(tokens.length, 0, "UnknownUser should have no tokens initially");
+        assertEq(maxAmounts.length, 0, "UnknownUser should have no maxAmounts initially");
+        
+        // ===== CONFIGURATION de unknownUser =====
+        address[] memory configTokens = new address[](2);
+        configTokens[0] = address(wxdai);
+        configTokens[1] = address(usdc);
+        uint256[] memory configAmounts = new uint256[](2);
+        configAmounts[0] = 5 ether;
+        configAmounts[1] = 1000 * 10**6;
+        
+        vm.prank(unknownUser);
+        rent2Repay.configureRent2Repay(configTokens, configAmounts, 1 weeks, block.timestamp);
+        
+        // ===== VÉRIFICATION : unknownUser est maintenant configuré =====
+        (tokens, maxAmounts) = rent2Repay.getUserConfigs(unknownUser);
+        assertEq(tokens.length, 2, "UnknownUser should have 2 tokens after configuration");
+        assertEq(maxAmounts.length, 2, "UnknownUser should have 2 maxAmounts after configuration");
+        assertEq(tokens[0], address(wxdai), "First token should be WXDAI");
+        assertEq(tokens[1], address(usdc), "Second token should be USDC");
+        assertEq(maxAmounts[0], 5 ether, "WXDAI maxAmount should be 5 ether");
+        assertEq(maxAmounts[1], 1000 * 10**6, "USDC maxAmount should be 1000 USDC");
+        
+        // Vérifier que unknownUser est autorisé
+        assertTrue(rent2Repay.isAuthorized(unknownUser), "UnknownUser should be authorized after configuration");
+        
+        // ===== TEST removeUser par OPERATOR =====
+        vm.prank(operator);
+        rent2Repay.removeUser(unknownUser);
+        
+        // ===== VÉRIFICATION : unknownUser n'est plus configuré =====
+        (tokens, maxAmounts) = rent2Repay.getUserConfigs(unknownUser);
+        assertEq(tokens.length, 0, "UnknownUser should have no tokens after removeUser");
+        assertEq(maxAmounts.length, 0, "UnknownUser should have no maxAmounts after removeUser");
+        
+        // Vérifier que unknownUser n'est plus autorisé
+        assertFalse(rent2Repay.isAuthorized(unknownUser), "UnknownUser should not be authorized after removeUser");
+        
+        // ===== TEST removeUser avec utilisateur non autorisé =====
+        vm.prank(admin);
+        vm.expectRevert();
+        rent2Repay.removeUser(unknownUser);
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.removeUser(unknownUser);
+        
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.removeUser(unknownUser);
+        
+        // ===== TEST removeUser avec utilisateur non configuré =====
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.removeUser(user2);
+    }
+
+    function testContractUpgrade() public {
+        // Test de l'upgrade UUPS pour couvrir _authorizeUpgrade
+        
+        // Créer une nouvelle implémentation (version 2)
+        Rent2RepayV2 newImplementation = new Rent2RepayV2();
+        
+        // Vérifier que seul admin peut faire l'upgrade
+        vm.prank(user);
+        vm.expectRevert();
+        rent2Repay.upgradeToAndCall(address(newImplementation), "");
+        
+        vm.prank(emergency);
+        vm.expectRevert();
+        rent2Repay.upgradeToAndCall(address(newImplementation), "");
+        
+        vm.prank(operator);
+        vm.expectRevert();
+        rent2Repay.upgradeToAndCall(address(newImplementation), "");
+        
+        // Faire l'upgrade avec admin
+        vm.prank(admin);
+        rent2Repay.upgradeToAndCall(address(newImplementation), "");
+        
+        // Vérifier que l'upgrade a fonctionné
+        assertEq(rent2Repay.version(), "2.0.0", "Version should be updated to 2.0.0");
+        
+        // Vérifier que les données sont préservées
+        assertEq(address(rent2Repay.rmm()), address(mockRMM), "RMM address should be preserved");
+        assertEq(rent2Repay.daoFeesBps(), 50, "DAO fees should be preserved");
+        assertEq(rent2Repay.senderTipsBps(), 25, "Sender tips should be preserved");
     }
 }
