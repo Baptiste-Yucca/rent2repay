@@ -23,6 +23,8 @@ contract Rent2RepayTest is Test {
     address public user2 = address(0x5);
     address public user3 = address(0x6);
     address public unknownUser = address(0x7);
+    address public daoTreasury = address(0x8);
+
     
     function setUp() public {
         // Créer les tokens d'abord
@@ -93,6 +95,10 @@ contract Rent2RepayTest is Test {
         wxdaiDebt.approve(address(mockRMM), type(uint256).max);
         vm.prank(user);
         usdcDebt.approve(address(mockRMM), type(uint256).max);
+        
+        // Configurer l'adresse treasury DAO après le déploiement
+        vm.prank(admin);
+        rent2Repay.updateDaoTreasuryAddress(daoTreasury);
     }
     
     function testInitialize() public view {
@@ -152,11 +158,12 @@ contract Rent2RepayTest is Test {
         vm.warp(block.timestamp + 2 seconds);
         
         // Récupérer la configuration des frais
-        (, uint256 senderTipsBps) = rent2Repay.getFeeConfiguration();
+        (uint256 daoFeesBps, uint256 senderTipsBps) = rent2Repay.getFeeConfiguration();
         
         // Mesurer les balances avant l'appel
         uint256 userBalanceBefore = wxdai.balanceOf(user);
         uint256 user2BalanceBefore = wxdai.balanceOf(user2);
+        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
         
         // Execute rent2repay avec user2 comme caller (qui reçoit les frais)
         vm.prank(user2);
@@ -165,17 +172,23 @@ contract Rent2RepayTest is Test {
         // Mesurer les balances après l'appel
         uint256 userBalanceAfter = wxdai.balanceOf(user);
         uint256 user2BalanceAfter = wxdai.balanceOf(user2);
+        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
         
         // Vérifier que l'utilisateur a payé
         assertLt(userBalanceAfter, userBalanceBefore);
         
-        // Calculer les frais attendus pour user2
+        // Calculer les frais attendus
         uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
+        uint256 expectedDaoFees = (amountRepaid * daoFeesBps) / 10000;
         uint256 expectedSenderTips = (amountRepaid * senderTipsBps) / 10000;
         
-        // Vérifier que user2 a reçu les frais
+        // Vérifier que user2 a reçu les frais de sender tips
         uint256 actualTipsReceived = user2BalanceAfter - user2BalanceBefore;
         assertEq(actualTipsReceived, expectedSenderTips, "User2 should receive correct sender tips");
+        
+        // Vérifier que la DAO treasury a reçu les frais DAO
+        uint256 actualDaoFeesReceived = daoTreasuryBalanceAfter - daoTreasuryBalanceBefore;
+        assertEq(actualDaoFeesReceived, expectedDaoFees, "DAO treasury should receive correct DAO fees");
         
         // ===== TEST avec token non défini =====
         address nonDefinedToken = address(0x1234); // Token non configuré
@@ -227,6 +240,7 @@ contract Rent2RepayTest is Test {
         uint256[] memory balancesBefore = new uint256[](2);
         balancesBefore[0] = wxdai.balanceOf(user);
         balancesBefore[1] = wxdai.balanceOf(user2);
+        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
         
         // ===== EXECUTION DU BATCH =====
         address[] memory users = new address[](2);
@@ -240,6 +254,7 @@ contract Rent2RepayTest is Test {
         uint256[] memory balancesAfter = new uint256[](2);
         balancesAfter[0] = wxdai.balanceOf(user);
         balancesAfter[1] = wxdai.balanceOf(user2);
+        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
         
         // ===== VÉRIFICATIONS =====
         // Vérifier que les deux utilisateurs sont toujours autorisés
@@ -259,6 +274,13 @@ contract Rent2RepayTest is Test {
         
         // Vérifier que les montants dépensés sont identiques (même configuration)
         assertEq(expectedSpent1, expectedSpent2, "Both users should have spent the same amount");
+        
+        // Vérifier que la DAO treasury a reçu les frais DAO
+        uint256 totalSpent = expectedSpent1 + expectedSpent2;
+        (uint256 daoFeesBps, ) = rent2Repay.getFeeConfiguration();
+        uint256 expectedDaoFees = (totalSpent * daoFeesBps) / 10000;
+        uint256 actualDaoFeesReceived = daoTreasuryBalanceAfter - daoTreasuryBalanceBefore;
+        assertEq(actualDaoFeesReceived, expectedDaoFees, "DAO treasury should receive correct DAO fees for batch");
         
         // ===== TEST avec token non défini =====
         address nonDefinedToken = address(0x5678); // Token non configuré
