@@ -220,18 +220,24 @@ contract Rent2RepayTest is Test {
         MockERC20(usdcDebt).approve(address(mockRMM), type(uint256).max);
         
         // ===== CONFIGURATION =====
-        // Configuration des tokens et montants
+        // Configuration des tokens et montants DIFFÉRENTS pour les deux utilisateurs
         address[] memory tokens = new address[](1);
         tokens[0] = address(wxdai);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 5 ether;
         
-        // Configurer Rent2Repay pour les deux utilisateurs
+        // Configuration pour user1 : 5 ether
+        uint256[] memory amounts1 = new uint256[](1);
+        amounts1[0] = 5 ether;
+        
+        // Configuration pour user2 : 1 ether
+        uint256[] memory amounts2 = new uint256[](1);
+        amounts2[0] = 1 ether;
+        
+        // Configurer Rent2Repay pour les deux utilisateurs avec des montants différents
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 weeks, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts1, 1 weeks, block.timestamp);
         
         vm.prank(user2);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 weeks, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts2, 1 weeks, block.timestamp);
         
         // Avancer le temps pour respecter la périodicité
         vm.warp(block.timestamp + 1 weeks + 1 seconds);
@@ -241,6 +247,7 @@ contract Rent2RepayTest is Test {
         balancesBefore[0] = wxdai.balanceOf(user);
         balancesBefore[1] = wxdai.balanceOf(user2);
         uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
+        uint256 operatorBalanceBefore = wxdai.balanceOf(operator);
         
         // ===== EXECUTION DU BATCH =====
         address[] memory users = new address[](2);
@@ -255,6 +262,7 @@ contract Rent2RepayTest is Test {
         balancesAfter[0] = wxdai.balanceOf(user);
         balancesAfter[1] = wxdai.balanceOf(user2);
         uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
+        uint256 operatorBalanceAfter = wxdai.balanceOf(operator);
         
         // ===== VÉRIFICATIONS =====
         // Vérifier que les deux utilisateurs sont toujours autorisés
@@ -269,18 +277,24 @@ contract Rent2RepayTest is Test {
         uint256 expectedSpent1 = balancesBefore[0] - balancesAfter[0];
         uint256 expectedSpent2 = balancesBefore[1] - balancesAfter[1];
         
-        assertLe(expectedSpent1, amounts[0], "User 1 should not have spent more than configured");
-        assertLe(expectedSpent2, amounts[0], "User 2 should not have spent more than configured");
+        assertLe(expectedSpent1, amounts1[0], "User 1 should not have spent more than configured (5 ether)");
+        assertLe(expectedSpent2, amounts2[0], "User 2 should not have spent more than configured (1 ether)");
         
-        // Vérifier que les montants dépensés sont identiques (même configuration)
-        assertEq(expectedSpent1, expectedSpent2, "Both users should have spent the same amount");
+        // Vérifier que les montants dépensés correspondent aux configurations respectives
+        assertEq(expectedSpent1, amounts1[0], "User 1 should have spent exactly 5 ether");
+        assertEq(expectedSpent2, amounts2[0], "User 2 should have spent exactly 1 ether");
         
-        // Vérifier que la DAO treasury a reçu les frais DAO
-        uint256 totalSpent = expectedSpent1 + expectedSpent2;
-        (uint256 daoFeesBps, ) = rent2Repay.getFeeConfiguration();
+        // Vérifier que la DAO treasury a reçu les frais DAO corrects
+        uint256 totalSpent = expectedSpent1 + expectedSpent2; // 5 ether + 1 ether = 6 ether
+        (uint256 daoFeesBps, uint256 senderTipsBps) = rent2Repay.getFeeConfiguration();
         uint256 expectedDaoFees = (totalSpent * daoFeesBps) / 10000;
         uint256 actualDaoFeesReceived = daoTreasuryBalanceAfter - daoTreasuryBalanceBefore;
-        assertEq(actualDaoFeesReceived, expectedDaoFees, "DAO treasury should receive correct DAO fees for batch");
+        assertEq(actualDaoFeesReceived, expectedDaoFees, "DAO treasury should receive correct DAO fees for batch (6 ether total)");
+        
+        // Vérifier que l'operator a reçu les sender tips
+        uint256 expectedSenderTips = (totalSpent * senderTipsBps) / 10000;
+        uint256 actualSenderTipsReceived = operatorBalanceAfter - operatorBalanceBefore;
+        assertEq(actualSenderTipsReceived, expectedSenderTips, "Operator should receive correct sender tips for batch (6 ether total)");
         
         // ===== TEST avec token non défini =====
         address nonDefinedToken = address(0x5678); // Token non configuré
