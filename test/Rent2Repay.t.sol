@@ -24,6 +24,7 @@ contract Rent2RepayTest is Test {
     address public user3 = address(0x6);
     address public unknownUser = address(0x7);
     address public daoTreasury = address(0x8);
+    MockERC20 public daoGovernanceToken;
 
     
     function setUp() public {
@@ -32,6 +33,7 @@ contract Rent2RepayTest is Test {
         usdc = new MockERC20("USD Coin", "USDC", 6, 1000000 * 10**6);
         wxdaiSupply = new MockERC20("WXDAI Supply", "aWXDAI", 18, 1000000 ether);
         usdcSupply = new MockERC20("USDC Supply", "aUSDC", 6, 1000000 * 10**6);
+        daoGovernanceToken = new MockERC20("DAO Governance", "DAO", 18, 1000000 ether);
         
         // Créer les debt tokens
         MockERC20 wxdaiDebt = new MockERC20("WXDAI Debt", "dWXDAI", 18, 1000000 ether);
@@ -99,6 +101,16 @@ contract Rent2RepayTest is Test {
         // Configurer l'adresse treasury DAO après le déploiement
         vm.prank(admin);
         rent2Repay.updateDaoTreasuryAddress(daoTreasury);
+        
+        // Configurer le token de gouvernance DAO et les paramètres de réduction
+        vm.prank(admin);
+        rent2Repay.updateDaoFeeReductionToken(address(daoGovernanceToken));
+        
+        vm.prank(admin);
+        rent2Repay.updateDaoFeeReductionMinimumAmount(100 ether); // 100 tokens minimum pour la réduction
+        
+        vm.prank(admin);
+        rent2Repay.updateDaoFeeReductionPercentage(5000); // 50% de réduction des frais DAO
     }
     
     function testInitialize() public view {
@@ -1108,5 +1120,129 @@ contract Rent2RepayTest is Test {
         assertEq(address(rent2Repay.rmm()), address(mockRMM), "RMM address should be preserved");
         assertEq(rent2Repay.daoFeesBps(), 50, "DAO fees should be preserved");
         assertEq(rent2Repay.senderTipsBps(), 25, "Sender tips should be preserved");
+    }
+    
+    function testDaoFeeReductionWithGovernanceToken() public {
+        _testDaoFeeReductionStep1();
+        _testDaoFeeReductionStep2();
+        _testDaoFeeReductionStep3();
+    }
+    
+    function _testDaoFeeReductionStep1() internal {
+        // ===== CONFIGURATION INITIALE =====
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(wxdai);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 10 ether;
+        
+        // Configurer user pour rent2repay
+        vm.prank(user);
+        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        
+        // Avancer le temps pour respecter la périodicité
+        vm.warp(block.timestamp + 2 seconds);
+        
+        // Récupérer la configuration des frais
+        (uint256 daoFeesBps, ) = rent2Repay.getFeeConfiguration();
+        
+        console.log("DAO fees BPS:", daoFeesBps);
+        
+        // ===== ÉTAPE 1: USER SANS TOKEN DE GOUVERNANCE =====
+        console.log("\n=== STEP 1: User without governance token ===");
+        
+        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
+        uint256 userBalanceBefore = wxdai.balanceOf(user);
+        
+        vm.prank(user2);
+        rent2Repay.rent2repay(user, address(wxdai));
+        
+        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
+        uint256 userBalanceAfter = wxdai.balanceOf(user);
+        
+        uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
+        uint256 expectedDaoFees = (amountRepaid * daoFeesBps) / 10000;
+        uint256 actualDaoFees = daoTreasuryBalanceAfter - daoTreasuryBalanceBefore;
+        
+        console.log("Amount repaid:", amountRepaid);
+        console.log("Expected DAO fees (no reduction):", expectedDaoFees);
+        console.log("Actual DAO fees received:", actualDaoFees);
+        
+        assertEq(actualDaoFees, expectedDaoFees, "DAO should receive full fees without governance token");
+    }
+    
+    function _testDaoFeeReductionStep2() internal {
+        // ===== STEP 2: USER WITH FEW GOVERNANCE TOKENS =====
+        console.log("\n=== STEP 2: User with few governance tokens ===");
+        
+        // Give only 50 tokens to user (less than minimum of 100)
+        daoGovernanceToken.mint(user, 50 ether);
+        
+        // Advance time for next period
+        vm.warp(block.timestamp + 2 seconds);
+        
+        (uint256 daoFeesBps, ) = rent2Repay.getFeeConfiguration();
+        
+        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
+        uint256 userBalanceBefore = wxdai.balanceOf(user);
+        
+        vm.prank(user2);
+        rent2Repay.rent2repay(user, address(wxdai));
+        
+        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
+        uint256 userBalanceAfter = wxdai.balanceOf(user);
+        
+        uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
+        uint256 expectedDaoFees = (amountRepaid * daoFeesBps) / 10000;
+        uint256 actualDaoFees = daoTreasuryBalanceAfter - daoTreasuryBalanceBefore;
+        
+        console.log("User governance token balance:", daoGovernanceToken.balanceOf(user));
+        console.log("Amount repaid:", amountRepaid);
+        console.log("Expected DAO fees (no reduction):", expectedDaoFees);
+        console.log("Actual DAO fees received:", actualDaoFees);
+        
+        assertEq(actualDaoFees, expectedDaoFees, "DAO should receive full fees with insufficient governance tokens");
+    }
+    
+    function _testDaoFeeReductionStep3() internal {
+        // ===== STEP 3: USER WITH SUFFICIENT GOVERNANCE TOKENS =====
+        console.log("\n=== STEP 3: User with sufficient governance tokens ===");
+        
+        // Give 150 tokens to user (more than minimum of 100)
+        daoGovernanceToken.mint(user, 100 ether); // Total: 150 tokens
+        
+        // Advance time for next period
+        vm.warp(block.timestamp + 2 seconds);
+        
+        (uint256 daoFeesBps, ) = rent2Repay.getFeeConfiguration();
+        uint256 reductionBps = rent2Repay.daoFeeReductionBps();
+        
+        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
+        uint256 userBalanceBefore = wxdai.balanceOf(user);
+        
+        vm.prank(user2);
+        rent2Repay.rent2repay(user, address(wxdai));
+        
+        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
+        uint256 userBalanceAfter = wxdai.balanceOf(user);
+        
+        uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
+        uint256 expectedDaoFeesFull = (amountRepaid * daoFeesBps) / 10000;
+        uint256 reductionAmount = (expectedDaoFeesFull * reductionBps) / 10000;
+        uint256 expectedDaoFeesReduced = expectedDaoFeesFull - reductionAmount;
+        uint256 actualDaoFees = daoTreasuryBalanceAfter - daoTreasuryBalanceBefore;
+        
+        console.log("User governance token balance:", daoGovernanceToken.balanceOf(user));
+        console.log("Amount repaid:", amountRepaid);
+        console.log("Expected DAO fees (full):", expectedDaoFeesFull);
+        console.log("Reduction amount (50%):", reductionAmount);
+        console.log("Expected DAO fees (reduced):", expectedDaoFeesReduced);
+        console.log("Actual DAO fees received:", actualDaoFees);
+        
+        assertEq(actualDaoFees, expectedDaoFeesReduced, "DAO should receive reduced fees with sufficient governance tokens");
+        assertLt(actualDaoFees, expectedDaoFeesFull, "Reduced fees should be less than full fees");
+        
+        // Verify that reduction is exactly 50%
+        uint256 reductionPercentage = ((expectedDaoFeesFull - actualDaoFees) * 10000) / expectedDaoFeesFull;
+        assertEq(reductionPercentage, reductionBps, "Reduction should be exactly 50%");
     }
 }

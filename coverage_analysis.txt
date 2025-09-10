@@ -1,0 +1,131 @@
+# ANALYSE DE COUVERTURE - Rent2Repay.sol
+# ================================================
+
+## 📊 STATUT ACTUEL DE LA COUVERTURE
+- **Lines**: 98.31% (233/237) ✅
+- **Statements**: 96.15% (225/234) ⚠️
+- **Branches**: 57.14% (28/49) ❌
+- **Functions**: 100.00% (52/52) ✅
+
+## 🎯 OBJECTIF
+Atteindre 100% de couverture sur Statements et Branches
+
+## 📋 STATEMENTS MANQUANTS (9 sur 234)
+========================================
+
+### 1. Modifiers - Branches false non testées
+- **Ligne 178**: `if (token == address(0))` - Branche `false` non testée
+- **Ligne 187**: `if (!_getR2rStorage().tokenConfig[token].active)` - Branche `false` non testée
+
+### 2. Validations dans configureRent2Repay
+- **Ligne 204**: `require(len > 0 && len == amounts.length)` - Cas d'erreur non testé
+- **Ligne 216**: `for (uint256 i = 0; i < len;)` - Boucle vide non testée
+
+### 3. Validations dans _validateUserAndToken
+- **Ligne 284**: `require($.lastRepayTimestamps[user] != 0)` - Cas d'erreur non testé
+- **Ligne 285**: `require($.allowedMaxAmounts[user][token] > 0)` - Cas d'erreur non testé
+- **Ligne 286**: `require($.periodicity[user][token] > 0)` - Cas d'erreur non testé
+- **Ligne 287**: `require(_isNewPeriod(user, token))` - Cas d'erreur non testé
+
+### 4. Validations dans giveApproval
+- **Ligne 564**: `require(spender != address(0))` - Cas d'erreur non testé
+- **Ligne 565**: `require(amount > 0)` - Cas d'erreur non testé
+- **Ligne 567**: `require(IERC20(token).approve(spender, amount))` - Cas d'erreur non testé
+
+## 🌿 BRANCHES MANQUANTES (21 sur 49)
+=====================================
+
+### 1. Modifiers non testés
+- **Ligne 178**: `validTokenAddress` - Branche `false` (token == address(0))
+- **Ligne 187**: `onlyAuthorizedToken` - Branche `false` (token non autorisé)
+
+### 2. Validations dans configureRent2Repay
+- **Ligne 204**: `len > 0 && len == amounts.length` - Cas d'erreur
+- **Ligne 216**: Boucle `for` - Cas où `len == 0`
+
+### 3. Validations dans _validateUserAndToken
+- **Ligne 283**: `$.lastRepayTimestamps[user] != 0` - Cas d'erreur
+- **Ligne 284**: `$.allowedMaxAmounts[user][token] > 0` - Cas d'erreur
+- **Ligne 285**: `$.periodicity[user][token] > 0` - Cas d'erreur
+- **Ligne 286**: `_isNewPeriod(user, token)` - Cas d'erreur
+
+### 4. Logique conditionnelle dans _handleRmmRepayment
+- **Ligne 366**: `if($.tokenConfig[token].supplyToken == token)` - Branche `true` non testée
+- **Ligne 368**: `require($.rmm.withdraw(...) == amountForRepayment)` - Cas d'erreur
+- **Ligne 386**: `if(difference > 0)` - Branche `false` non testée
+
+### 5. Validations dans giveApproval
+- **Ligne 564**: `spender != address(0)` - Cas d'erreur
+- **Ligne 565**: `amount > 0` - Cas d'erreur
+- **Ligne 567**: `IERC20(token).approve(spender, amount)` - Cas d'erreur
+
+### 6. Logique conditionnelle dans _transferFees
+- **Ligne 777**: `daoFees > 0 && $.daoTreasuryAddress != address(0)` - Branche `false` non testée
+- **Ligne 778**: `IERC20(token).transfer($.daoTreasuryAddress, daoFees)` - Cas d'erreur
+- **Ligne 784**: `senderTips > 0` - Branche `false` non testée
+- **Ligne 785**: `IERC20(token).transfer(msg.sender, senderTips)` - Cas d'erreur
+
+### 7. Logique conditionnelle dans _calculateFees
+- **Ligne 623**: `$.daoFeeReductionToken != address(0) && $.daoFeeReductionMinimumAmount > 0` - Branche `false` non testée
+- **Ligne 625**: `userBalance >= $.daoFeeReductionMinimumAmount` - Branche `false` non testée
+- **Ligne 633**: `totalFees > amount` - Cas d'erreur
+
+### 8. Logique conditionnelle dans getUserConfigs
+- **Ligne 476**: `$.lastRepayTimestamps[user] == 0` - Branche `true` non testée
+- **Ligne 489**: `$.tokenConfig[$.tokenList[i]].active && $.allowedMaxAmounts[user][$.tokenList[i]] > 0` - Branche `false` non testée
+
+### 9. Logique conditionnelle dans getActiveTokens
+- **Ligne 804**: `$.tokenConfig[t].active` - Branche `false` non testée
+
+### 10. Logique conditionnelle dans batchRent2Repay
+- **Ligne 433**: `user != address(0)` - Cas d'erreur
+- **Ligne 447**: `totalDaoFees > 0 || totalSenderTips > 0` - Branche `false` non testée
+
+## 🚀 PLAN D'ACTION POUR AMÉLIORER LA COUVERTURE
+===============================================
+
+### Phase 1: Tests des Modifiers
+1. **testValidTokenAddressModifier()** - Tester avec token == address(0)
+2. **testOnlyAuthorizedTokenModifier()** - Tester avec token non autorisé
+
+### Phase 2: Tests des Validations
+3. **testConfigureRent2RepayValidationErrors()** - Arrays vides, longueurs différentes
+4. **testValidateUserAndTokenErrors()** - Utilisateur non autorisé, période non respectée
+5. **testGiveApprovalValidationErrors()** - Spender invalide, amount = 0, approve échoué
+
+### Phase 3: Tests de la Logique Conditionnelle
+6. **testHandleRmmRepaymentEdgeCases()** - supplyToken == token, withdraw échoué, difference = 0
+7. **testTransferFeesEdgeCases()** - daoFees = 0, senderTips = 0, transferts échoués
+8. **testCalculateFeesEdgeCases()** - Pas de token de réduction, balance insuffisante, totalFees > amount
+9. **testGetUserConfigsEdgeCases()** - Utilisateur non configuré, tokens inactifs
+10. **testGetActiveTokensEdgeCases()** - Tokens inactifs
+11. **testBatchRent2RepayEdgeCases()** - User = address(0), pas de frais
+
+### Phase 4: Tests des Cas Limites
+12. **testEdgeCaseScenarios()** - Scénarios complexes combinant plusieurs conditions
+
+## 📈 IMPACT ATTENDU
+- **Statements**: 96.15% → 100% (+3.85%)
+- **Branches**: 57.14% → 100% (+42.86%)
+- **Couverture globale**: 83.59% → ~95% (+11.41%)
+
+## 🔧 COMMANDES UTILES
+```bash
+# Lancer la couverture
+forge coverage
+
+# Lancer la couverture avec rapport détaillé
+forge coverage --report-file coverage.txt --report lcov
+
+# Lancer un test spécifique
+forge test --match-test testName -vv
+
+# Lancer tous les tests
+forge test
+```
+
+## 📝 NOTES
+- Certains cas d'erreur peuvent nécessiter des mocks spécifiques
+- Les tests de transferts échoués peuvent nécessiter des tokens mockés
+- La logique conditionnelle complexe peut nécessiter plusieurs scénarios
+- Prioriser les branches les plus critiques pour la sécurité
