@@ -138,6 +138,17 @@ contract Rent2RepayCoverageTest is Test {
         rent2Repay.rent2repay(user, address(0));
     }
     
+    function testValidTokenAddressModifierWithValidToken() public {
+        // Test du modifier validTokenAddress avec token valide (non-zero address)
+        // Ce test doit passer et couvrir la branche false du modifier
+        
+        // Test avec updateDaoFeeReductionToken qui utilise aussi validTokenAddress
+        vm.prank(admin);
+        rent2Repay.updateDaoFeeReductionToken(address(daoGovernanceToken));
+        
+        console.log("SUCCESS: validTokenAddress modifier with valid token - branch false covered");
+    }
+    
     function testBatchRent2RepayWithZeroAddressToken() public {
         // Test du modifier validTokenAddress avec batchRent2Repay
         // Configurer user pour rent2repay d'abord
@@ -414,5 +425,88 @@ contract Rent2RepayCoverageTest is Test {
         vm.prank(admin);
         vm.expectRevert("Approval failed");
         rent2Repay.giveApproval(address(failingToken), address(mockRMM), 1000 ether);
+    }
+    
+    // ===== TESTS DE COUVERTURE POUR getActiveTokens (ligne 804) =====
+    
+    function testGetActiveTokensWithActiveAndInactiveTokens() public {
+        // Test de la ligne 804: if ($.tokenConfig[t].active)
+        // Cas true: token actif
+        // Cas false: token inactif
+        
+        // ===== ÉTAPE 1: VÉRIFIER L'ÉTAT INITIAL =====
+        // Au début, wxdai et usdc sont actifs
+        address[] memory initialActiveTokens = rent2Repay.getActiveTokens();
+        assertGe(initialActiveTokens.length, 2, "Should have at least 2 active tokens initially");
+        
+        // Vérifier que wxdai et usdc sont dans la liste des tokens actifs
+        bool wxdaiFound = false;
+        bool usdcFound = false;
+        for (uint i = 0; i < initialActiveTokens.length; i++) {
+            if (initialActiveTokens[i] == address(wxdai)) wxdaiFound = true;
+            if (initialActiveTokens[i] == address(usdc)) usdcFound = true;
+        }
+        assertTrue(wxdaiFound, "WXDAI should be active initially");
+        assertTrue(usdcFound, "USDC should be active initially");
+        
+        // ===== ÉTAPE 2: AJOUTER UN NOUVEAU TOKEN (ACTIF) =====
+        // Créer un nouveau token pour le test
+        MockERC20 testToken = new MockERC20("Test Token", "TEST", 18, 1000000 ether);
+        MockERC20 testSupplyToken = new MockERC20("Test Supply", "aTEST", 18, 1000000 ether);
+        
+        // Ajouter le token (il sera actif par défaut)
+        vm.prank(admin);
+        rent2Repay.authorizeTokenPair(address(testToken), address(testSupplyToken));
+        
+        // Vérifier que le token est maintenant dans la liste des tokens actifs
+        address[] memory tokensAfterAdd = rent2Repay.getActiveTokens();
+        assertGt(tokensAfterAdd.length, initialActiveTokens.length, "Should have more tokens after adding");
+        
+        bool testTokenFound = false;
+        for (uint i = 0; i < tokensAfterAdd.length; i++) {
+            if (tokensAfterAdd[i] == address(testToken)) {
+                testTokenFound = true;
+                break;
+            }
+        }
+        assertTrue(testTokenFound, "Test token should be active after adding");
+        
+        // ===== ÉTAPE 3: DÉSACTIVER LE TOKEN (INACTIF) =====
+        // Désactiver le token (il reste dans tokenList mais devient inactif)
+        vm.prank(admin);
+        rent2Repay.unauthorizeToken(address(testToken));
+        
+        // Vérifier que le token n'est plus dans la liste des tokens actifs
+        address[] memory tokensAfterRemove = rent2Repay.getActiveTokens();
+        assertLt(tokensAfterRemove.length, tokensAfterAdd.length, "Should have fewer tokens after removing");
+        
+        bool testTokenStillFound = false;
+        for (uint i = 0; i < tokensAfterRemove.length; i++) {
+            if (tokensAfterRemove[i] == address(testToken)) {
+                testTokenStillFound = true;
+                break;
+            }
+        }
+        assertFalse(testTokenStillFound, "Test token should not be active after removing");
+        
+        // Vérifier que wxdai et usdc sont toujours actifs
+        bool wxdaiStillFound = false;
+        bool usdcStillFound = false;
+        for (uint i = 0; i < tokensAfterRemove.length; i++) {
+            if (tokensAfterRemove[i] == address(wxdai)) wxdaiStillFound = true;
+            if (tokensAfterRemove[i] == address(usdc)) usdcStillFound = true;
+        }
+        assertTrue(wxdaiStillFound, "WXDAI should still be active");
+        assertTrue(usdcStillFound, "USDC should still be active");
+        
+        // ===== VÉRIFICATION FINALE =====
+        // Le test couvre maintenant les deux cas de la ligne 804:
+        // - Cas true: testToken était actif (ligne 804 = true)
+        // - Cas false: testToken est devenu inactif (ligne 804 = false)
+        
+        // Vérifier la configuration du token désactivé
+        Rent2Repay.TokenConfig memory config = rent2Repay.tokenConfig(address(testToken));
+        assertEq(config.token, address(testToken), "Token address should be preserved");
+        assertFalse(config.active, "Token should be inactive after unauthorize");
     }
 }

@@ -2,112 +2,121 @@
 # ================================================
 
 ## 📊 STATUT ACTUEL DE LA COUVERTURE
-- **Lines**: 98.31% (233/237) ✅
-- **Statements**: 96.15% (225/234) ⚠️
-- **Branches**: 57.14% (28/49) ❌
+- **Lines**: 99.58% (236/237) ✅
+- **Statements**: 97.44% (228/234) ✅
+- **Branches**: 69.39% (34/49) ⚠️
 - **Functions**: 100.00% (52/52) ✅
 
 ## 🎯 OBJECTIF
-Atteindre 100% de couverture sur Statements et Branches
+Atteindre 100% de couverture sur Branches (15 branches manquantes)
 
-## 📋 STATEMENTS MANQUANTS (9 sur 234)
-========================================
+## 🌿 BRANCHES RÉELLEMENT NON COUVERTES (15 sur 49)
+==================================================
 
 ### 1. Modifiers - Branches false non testées
 - **Ligne 178**: `if (token == address(0))` - Branche `false` non testée
+  - **Code**: `if (token == address(0)) revert InvalidTokenAddress();`
+  - **Test manquant**: Appeler avec un token valide (non-zero address)
+  - **Testable**: ✅ OUI - Facile à tester
+
 - **Ligne 187**: `if (!_getR2rStorage().tokenConfig[token].active)` - Branche `false` non testée
+  - **Code**: `if (!_getR2rStorage().tokenConfig[token].active) revert TokenNotAuthorized();`
+  - **Test manquant**: Appeler avec un token actif
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 2. Validations dans configureRent2Repay
-- **Ligne 204**: `require(len > 0 && len == amounts.length)` - Cas d'erreur non testé
-- **Ligne 216**: `for (uint256 i = 0; i < len;)` - Boucle vide non testée
+### 2. Validations dans _validateUserAndToken
+- **Ligne 285**: `require($.lastRepayTimestamps[user] != 0)` - Branche `false` non testée
+  - **Code**: `require($.lastRepayTimestamps[user] != 0, "User not authorized");`
+  - **Test manquant**: Appeler avec un utilisateur autorisé (lastRepayTimestamps != 0)
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 3. Validations dans _validateUserAndToken
-- **Ligne 284**: `require($.lastRepayTimestamps[user] != 0)` - Cas d'erreur non testé
-- **Ligne 285**: `require($.allowedMaxAmounts[user][token] > 0)` - Cas d'erreur non testé
-- **Ligne 286**: `require($.periodicity[user][token] > 0)` - Cas d'erreur non testé
-- **Ligne 287**: `require(_isNewPeriod(user, token))` - Cas d'erreur non testé
-
-### 4. Validations dans giveApproval
-- **Ligne 564**: `require(spender != address(0))` - Cas d'erreur non testé
-- **Ligne 565**: `require(amount > 0)` - Cas d'erreur non testé
-- **Ligne 567**: `require(IERC20(token).approve(spender, amount))` - Cas d'erreur non testé
-
-## 🌿 BRANCHES MANQUANTES (21 sur 49)
-=====================================
-
-### 1. Modifiers non testés
-- **Ligne 178**: `validTokenAddress` - Branche `false` (token == address(0))
-- **Ligne 187**: `onlyAuthorizedToken` - Branche `false` (token non autorisé)
-
-### 2. Validations dans configureRent2Repay
-- **Ligne 204**: `len > 0 && len == amounts.length` - Cas d'erreur
-- **Ligne 216**: Boucle `for` - Cas où `len == 0`
-
-### 3. Validations dans _validateUserAndToken
-- **Ligne 283**: `$.lastRepayTimestamps[user] != 0` - Cas d'erreur
-- **Ligne 284**: `$.allowedMaxAmounts[user][token] > 0` - Cas d'erreur
-- **Ligne 285**: `$.periodicity[user][token] > 0` - Cas d'erreur
-- **Ligne 286**: `_isNewPeriod(user, token)` - Cas d'erreur
+### 3. Logique conditionnelle dans _handleTokenTransferAndFees
+- **Ligne 339**: `if (supplyToken == token)` - Branche `false` non testée
+  - **Code**: `if (supplyToken == token) { ... }`
+  - **Test manquant**: Cas où supplyToken != token
+  - **Testable**: ✅ OUI - Facile à tester
 
 ### 4. Logique conditionnelle dans _handleRmmRepayment
-- **Ligne 366**: `if($.tokenConfig[token].supplyToken == token)` - Branche `true` non testée
-- **Ligne 368**: `require($.rmm.withdraw(...) == amountForRepayment)` - Cas d'erreur
-- **Ligne 386**: `if(difference > 0)` - Branche `false` non testée
+- **Ligne 366**: `if (supplyToken == token)` - Branche `false` non testée
+  - **Code**: `if (supplyToken == token) { ... }`
+  - **Test manquant**: Cas où supplyToken != token
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 5. Validations dans giveApproval
-- **Ligne 564**: `spender != address(0)` - Cas d'erreur
-- **Ligne 565**: `amount > 0` - Cas d'erreur
-- **Ligne 567**: `IERC20(token).approve(spender, amount)` - Cas d'erreur
+- **Ligne 368**: `if (difference > 0)` - Branche `false` non testée
+  - **Code**: `if (difference > 0) { ... }`
+  - **Test manquant**: Cas où difference <= 0
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 6. Logique conditionnelle dans _transferFees
-- **Ligne 777**: `daoFees > 0 && $.daoTreasuryAddress != address(0)` - Branche `false` non testée
-- **Ligne 778**: `IERC20(token).transfer($.daoTreasuryAddress, daoFees)` - Cas d'erreur
-- **Ligne 784**: `senderTips > 0` - Branche `false` non testée
-- **Ligne 785**: `IERC20(token).transfer(msg.sender, senderTips)` - Cas d'erreur
+- **Ligne 387**: `if (supplyToken == token)` - Branche `false` non testée
+  - **Code**: `if (supplyToken == token) { ... }`
+  - **Test manquant**: Cas où supplyToken != token
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 7. Logique conditionnelle dans _calculateFees
-- **Ligne 623**: `$.daoFeeReductionToken != address(0) && $.daoFeeReductionMinimumAmount > 0` - Branche `false` non testée
-- **Ligne 625**: `userBalance >= $.daoFeeReductionMinimumAmount` - Branche `false` non testée
-- **Ligne 633**: `totalFees > amount` - Cas d'erreur
+### 5. Logique conditionnelle dans batchRent2Repay
+- **Ligne 433**: `if (user != address(0))` - Branche `false` non testée
+  - **Code**: `if (user != address(0)) { ... }`
+  - **Test manquant**: Cas où user == address(0)
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 8. Logique conditionnelle dans getUserConfigs
-- **Ligne 476**: `$.lastRepayTimestamps[user] == 0` - Branche `true` non testée
-- **Ligne 489**: `$.tokenConfig[$.tokenList[i]].active && $.allowedMaxAmounts[user][$.tokenList[i]] > 0` - Branche `false` non testée
+### 6. Logique conditionnelle dans _calculateFees
+- **Ligne 633**: `if (totalFees > amount)` - Branche `false` non testée
+  - **Code**: `if (totalFees > amount) revert ExceedAmount();`
+  - **Test manquant**: Cas où totalFees <= amount (cas normal)
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 9. Logique conditionnelle dans getActiveTokens
-- **Ligne 804**: `$.tokenConfig[t].active` - Branche `false` non testée
+### 7. Logique conditionnelle dans emergencyTokenRecovery
+- **Ligne 651**: `if (amount > 0)` - Branche `false` non testée
+  - **Code**: `if (amount > 0) { ... }`
+  - **Test manquant**: Cas où amount == 0
+  - **Testable**: ✅ OUI - Facile à tester
 
-### 10. Logique conditionnelle dans batchRent2Repay
-- **Ligne 433**: `user != address(0)` - Cas d'erreur
-- **Ligne 447**: `totalDaoFees > 0 || totalSenderTips > 0` - Branche `false` non testée
+### 8. Logique conditionnelle dans updateDaoFees
+- **Ligne 663**: `if (newFeesBPS + $.senderTipsBps > 10000)` - Branche `false` non testée
+  - **Code**: `if (newFeesBPS + $.senderTipsBps > 10000) revert InvalidFeesBPS();`
+  - **Test manquant**: Cas où newFeesBPS + senderTipsBps <= 10000
+  - **Testable**: ✅ OUI - Facile à tester
+
+### 9. Logique conditionnelle dans updateSenderTips
+- **Ligne 676**: `if ($.daoFeesBps + newTipsBPS > 10000)` - Branche `false` non testée
+  - **Code**: `if ($.daoFeesBps + newTipsBPS > 10000) revert InvalidTipsBPS();`
+  - **Test manquant**: Cas où daoFeesBps + newTipsBPS <= 10000
+  - **Testable**: ✅ OUI - Facile à tester
+
+### 10. Logique conditionnelle dans _transferFees
+- **Ligne 778**: `if (daoTreasuryAddress != address(0))` - Branche `false` non testée
+  - **Code**: `if (daoTreasuryAddress != address(0)) { ... }`
+  - **Test manquant**: Cas où daoTreasuryAddress == address(0)
+  - **Testable**: ✅ OUI - Facile à tester
+
+- **Ligne 785**: `if (msg.sender != address(0))` - Branche `false` non testée
+  - **Code**: `if (msg.sender != address(0)) { ... }`
+  - **Test manquant**: Cas où msg.sender == address(0)
+  - **Testable**: ❌ NON - Impossible (msg.sender ne peut jamais être address(0))
 
 ## 🚀 PLAN D'ACTION POUR AMÉLIORER LA COUVERTURE
 ===============================================
 
-### Phase 1: Tests des Modifiers
-1. **testValidTokenAddressModifier()** - Tester avec token == address(0)
-2. **testOnlyAuthorizedTokenModifier()** - Tester avec token non autorisé
+### Phase 1: Tests des Modifiers (2 branches)
+1. **testValidTokenAddressWithValidToken()** - Tester avec token valide
+2. **testOnlyAuthorizedTokenWithActiveToken()** - Tester avec token actif
 
-### Phase 2: Tests des Validations
-3. **testConfigureRent2RepayValidationErrors()** - Arrays vides, longueurs différentes
-4. **testValidateUserAndTokenErrors()** - Utilisateur non autorisé, période non respectée
-5. **testGiveApprovalValidationErrors()** - Spender invalide, amount = 0, approve échoué
+### Phase 2: Tests des Validations (1 branche)
+3. **testValidateUserAndTokenWithAuthorizedUser()** - Tester avec utilisateur autorisé
 
-### Phase 3: Tests de la Logique Conditionnelle
-6. **testHandleRmmRepaymentEdgeCases()** - supplyToken == token, withdraw échoué, difference = 0
-7. **testTransferFeesEdgeCases()** - daoFees = 0, senderTips = 0, transferts échoués
-8. **testCalculateFeesEdgeCases()** - Pas de token de réduction, balance insuffisante, totalFees > amount
-9. **testGetUserConfigsEdgeCases()** - Utilisateur non configuré, tokens inactifs
-10. **testGetActiveTokensEdgeCases()** - Tokens inactifs
-11. **testBatchRent2RepayEdgeCases()** - User = address(0), pas de frais
-
-### Phase 4: Tests des Cas Limites
-12. **testEdgeCaseScenarios()** - Scénarios complexes combinant plusieurs conditions
+### Phase 3: Tests de la Logique Conditionnelle (11 branches)
+4. **testHandleTokenTransferAndFeesWithDifferentTokens()** - supplyToken != token
+5. **testHandleRmmRepaymentWithDifferentTokens()** - supplyToken != token (2 branches)
+6. **testHandleRmmRepaymentWithNoDifference()** - difference <= 0
+7. **testBatchRent2RepayWithZeroAddressUser()** - user == address(0)
+8. **testCalculateFeesNormalCase()** - totalFees <= amount
+9. **testEmergencyTokenRecoveryWithZeroAmount()** - amount == 0
+10. **testUpdateDaoFeesValidCase()** - newFeesBPS + senderTipsBps <= 10000
+11. **testUpdateSenderTipsValidCase()** - daoFeesBps + newTipsBPS <= 10000
+12. **testTransferFeesWithZeroTreasury()** - daoTreasuryAddress == address(0)
 
 ## 📈 IMPACT ATTENDU
-- **Statements**: 96.15% → 100% (+3.85%)
-- **Branches**: 57.14% → 100% (+42.86%)
-- **Couverture globale**: 83.59% → ~95% (+11.41%)
+- **Branches**: 69.39% → 100% (+30.61%)
+- **Couverture globale**: ~85% → ~95% (+10%)
 
 ## 🔧 COMMANDES UTILES
 ```bash
@@ -125,7 +134,15 @@ forge test
 ```
 
 ## 📝 NOTES
-- Certains cas d'erreur peuvent nécessiter des mocks spécifiques
-- Les tests de transferts échoués peuvent nécessiter des tokens mockés
-- La logique conditionnelle complexe peut nécessiter plusieurs scénarios
+- **14 branches testables** sur 15 branches manquantes
+- **1 branche impossible** à tester (msg.sender == address(0))
+- La plupart des branches manquantes sont des cas "normaux" (branches `false`)
 - Prioriser les branches les plus critiques pour la sécurité
+
+## 🎯 PRIORITÉS
+1. **Haute priorité**: Modifiers, validations, cas d'erreur
+2. **Moyenne priorité**: Logique conditionnelle normale
+3. **Basse priorité**: Cas limites impossibles en pratique
+
+## ❌ BRANCHES IMPOSSIBLES À TESTER
+- **Ligne 785**: `if (msg.sender != address(0))` - msg.sender ne peut jamais être address(0)
