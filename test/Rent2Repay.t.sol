@@ -53,11 +53,7 @@ contract Rent2RepayTest is Test {
         supplyTokens[1] = address(usdcSupply);
         
         mockRMM = new MockRMM(tokens, debtTokens, supplyTokens);
-        mockRMM.setMode(0); // Mode normal sans soustraction
-        
-        // Vérifier que le mode par défaut est 0
-        assertEq(mockRMM.getMode(), 0, "Default mode should be 0");
-        
+
         // 1. Deploy l'implémentation
         Rent2Repay implementation = new Rent2Repay();
         
@@ -335,45 +331,6 @@ contract Rent2RepayTest is Test {
         assertFalse(rent2Repay.isAuthorized(user));
     }
 
-
-
-    function testRmmModeDifference() public {
-        // Test pour vérifier la gestion des différences avec le mode 1 du MockRMM
-        
-        // Configuration
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(wxdai);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 10 ether;
-        
-        vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
-        
-        // Avancer le temps pour respecter la périodicité
-        vm.warp(block.timestamp + 2 seconds);
-        
-        // ===== TEST MODE 1 (avec différence) =====
-        mockRMM.setMode(1); // Mode avec soustraction de 100 wei
-        
-        uint256 balanceBefore = wxdai.balanceOf(user);
-        vm.prank(user2);
-        rent2Repay.rent2repay(user, address(wxdai));
-        uint256 balanceAfter = wxdai.balanceOf(user);
-        
-        uint256 spent = balanceBefore - balanceAfter;
-        
-        // Vérifier que le montant dépensé est correct (10 ether - 100 wei)
-        // L'utilisateur paie 10 ether, mais le MockRMM en mode 1 soustrait 100 wei
-        // La différence (100 wei) est remboursée à l'utilisateur
-        assertEq(spent, 10 ether - 100, "User should have spent 10 ether minus 100 wei");
-        
-        // Vérifier que le mode est bien 1
-        assertEq(mockRMM.getMode(), 1, "MockRMM should be in mode 1");
-        
-        // ===== REMETTRE EN MODE 0 =====
-        mockRMM.setMode(0);
-        assertEq(mockRMM.getMode(), 0, "MockRMM should be back to mode 0");
-    }
 
     // ===== TESTS DE COUVERTURE =====
     
@@ -1245,4 +1202,59 @@ contract Rent2RepayTest is Test {
         uint256 reductionPercentage = ((expectedDaoFeesFull - actualDaoFees) * 10000) / expectedDaoFeesFull;
         assertEq(reductionPercentage, reductionBps, "Reduction should be exactly 50%");
     }
+    function testSupplyTokenRepayment() public {
+        // Mint supply tokens to the user
+        uint256 supplyAmount = 10000 * 10**6; // 10000 USDC worth (enough for the test)
+        usdcSupply.mint(user, supplyAmount);
+        
+        // Configure user for the supply token (usdcSupply)
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(usdcSupply);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 10000;
+        usdc.mint(address(mockRMM), amounts[0] ); 
+        
+        vm.prank(user);
+        rent2Repay.configureRent2Repay(tokens, amounts, 1 weeks, 1);
+        
+        // User approves the contract to spend supply tokens
+        vm.prank(user);
+        usdcSupply.approve(address(rent2Repay), supplyAmount);
+        
+        // Warp to next period to allow repayment
+        vm.warp(block.timestamp + 1 weeks + 1);
+        
+        // Get initial balances
+        uint256 userSupplyBalanceBefore = usdcSupply.balanceOf(user);
+        uint256 userUsdcBalanceBefore = usdc.balanceOf(user);
+        uint256 user2SupplyBalanceBefore = usdcSupply.balanceOf(user2);
+        uint256 daoTreasurySupplyBalanceBefore = usdcSupply.balanceOf(daoTreasury);
+        // Execute repayment using supply token (user2 calls for user)
+        vm.prank(user2);
+        rent2Repay.rent2repay(user, address(usdcSupply));
+        
+        // Get final balances
+        assertEq(userUsdcBalanceBefore, usdc.balanceOf(user), "User USDC Balance has changed");
+  
+        // Verify that user paid with supply tokens
+        assertLt(usdcSupply.balanceOf(user), userSupplyBalanceBefore, "Supply balance has not be reduced");
+        
+        // Calculate expected fees (same as regular rent2repay)
+        uint256 daoFeesBps = rent2Repay.daoFeesBps();
+        uint256 senderTipsBps = rent2Repay.senderTipsBps();
+        uint256 expectedDaoFees = (amounts[0] * daoFeesBps) / 10000;
+        uint256 expectedSenderTips = (amounts[0] * senderTipsBps) / 10000;
+        
+        // Verify that user2 received the sender tips (in supplyUSDC)
+        uint256 user2SupplyBalanceAfter = usdcSupply.balanceOf(user2);
+        assertEq(user2SupplyBalanceAfter, expectedSenderTips+user2SupplyBalanceBefore, "User2 should receive correct sender tips in supplyUSDC");
+        
+        // Verify that DAO treasury received the DAO fees (in supplyUSDC)
+        uint256 daoTreasurySupplyBalanceAfter = usdcSupply.balanceOf(daoTreasury);
+        assertEq(daoTreasurySupplyBalanceAfter, expectedDaoFees+daoTreasurySupplyBalanceBefore, "DAO treasury should receive correct DAO fees in supplyUSDC");
+
+        // Verify that the contract consumed supply tokens (transferred to MockRMM)
+        uint256 contractSupplyBalanceAfter = usdcSupply.balanceOf(address(rent2Repay));
+        assertEq(contractSupplyBalanceAfter, 0, "Contract should not hold supply tokens after repayment");
+    } 
 }

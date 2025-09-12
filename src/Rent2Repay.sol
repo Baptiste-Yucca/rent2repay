@@ -374,7 +374,8 @@ contract Rent2Repay is
                 "Withdrawn amount mismatch"
             );
         }
-        
+        /// @dev Note: Onlycase where RMM returns a different amount than the amountForRepayment is when amountForRepayment == max uint256
+
         actualAmountRepaid = $.rmm.repay(
             $.tokenConfig[token].token,
             amountForRepayment,
@@ -382,19 +383,7 @@ contract Rent2Repay is
             user
         );
 
-        uint256 difference = amountForRepayment - actualAmountRepaid;
-        if(difference > 0) {
-            require(
-                IERC20($.tokenConfig[token].token).transfer(user, difference),
-                "transfer to user failed"
-            );
-        }
-
-        /// @dev Adjust fees if there is difference
         adjustedDaoFees = daoFees;
-        if(difference > 0) {
-            adjustedDaoFees = daoFees > difference ? daoFees - difference : 0; 
-        }
     }
 
     function rent2repay(address user, address token) 

@@ -14,15 +14,6 @@ contract MockRMM is IRMM {
     mapping(address => address) public tokenToDebtToken;
     mapping(address => address) public tokenToSupplyToken;
     
-    // Mode de fonctionnement pour les tests
-    // 0 = fonctionnement normal (retourne amount)
-    // 1 = retourne amount - 100 wei (pour simuler difference > 0)
-    // 2 = retourne amount - customDifference (pour simuler difference personnalisée)
-    uint256 public mode;
-    
-    // Différence personnalisée pour le mode 2
-    uint256 public customDifference;
-
     event Repaid(address token, uint256 amount, uint256 mode, address user);
     event Withdrawn(address token, uint256 amount, address to);
     event ModeChanged(uint256 oldMode, uint256 newMode);
@@ -42,44 +33,10 @@ contract MockRMM is IRMM {
             tokenToSupplyToken[tokens[i]] = supplyTokens[i];
         }
         
-        // Mode par défaut = 0 (fonctionnement normal)
-        mode = 0;
     }
 
-    /**
-     * @notice Définit le mode de fonctionnement
-     * @param newMode Le nouveau mode (0 = normal, 1 = soustraction 100 wei, 2 = soustraction personnalisée)
-     */
-    function setMode(uint256 newMode) external {
-        require(newMode <= 2, "Mode must be 0, 1, or 2");
-        uint256 oldMode = mode;
-        mode = newMode;
-        emit ModeChanged(oldMode, newMode);
-    }
 
-    /**
-     * @notice Définit la différence personnalisée pour le mode 2
-     * @param newDifference La nouvelle différence en wei
-     */
-    function setCustomDifference(uint256 newDifference) external {
-        customDifference = newDifference;
-    }
-
-    /**
-     * @notice Récupère la différence personnalisée
-     * @return La différence personnalisée actuelle
-     */
-    function getCustomDifference() external view returns (uint256) {
-        return customDifference;
-    }
-
-    /**
-     * @notice Récupère le mode actuel
-     * @return Le mode actuel
-     */
-    function getMode() external view returns (uint256) {
-        return mode;
-    }
+ 
 
     /**
      * @notice Simule le remboursement de dette
@@ -99,19 +56,9 @@ contract MockRMM is IRMM {
         // Récupérer le token de dette correspondant
         address debtToken = tokenToDebtToken[asset];
         
-        // Calculer le montant réellement remboursé selon le mode (pas interestRateMode)
-        uint256 actualRepaidAmount;
-        if (mode == 1) {
-            // Mode 1: soustraire 100 wei pour simuler une différence
-            require(amount > 100, "Amount must be greater than 100 wei in mode 1");
-            actualRepaidAmount = amount - 100;
-        } else {
-            // Mode 0: fonctionnement normal
-            actualRepaidAmount = amount;
-        }
-        
-        // Simuler le remboursement en transférant les debt tokens vers l'adresse 0
-        // (équivalent à les brûler) - on brûle le montant réellement remboursé
+
+        uint256 actualRepaidAmount = amount;
+
         if(IERC20(debtToken).balanceOf(onBehalfOf) < actualRepaidAmount) {
             revert("Insufficient balance");
         }

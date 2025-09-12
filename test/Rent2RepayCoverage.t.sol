@@ -54,11 +54,6 @@ contract Rent2RepayCoverageTest is Test {
         supplyTokens[1] = address(usdcSupply);
         
         mockRMM = new MockRMM(tokens, debtTokens, supplyTokens);
-        mockRMM.setMode(0); // Mode normal sans soustraction
-        
-        // Vérifier que le mode par défaut est 0
-        assertEq(mockRMM.getMode(), 0, "Default mode should be 0");
-        
         // 1. Deploy l'implémentation
         Rent2Repay implementation = new Rent2Repay();
         

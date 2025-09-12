@@ -49,7 +49,6 @@ contract Rent2RepayHarnessSimpleTest is Test {
         supplyTokens[1] = address(usdcSupply);
         
         mockRMM = new MockRMM(tokens, debtTokens, supplyTokens);
-        mockRMM.setMode(0);
         
         // Deploy avec proxy normal
         Rent2RepayHarness implementation = new Rent2RepayHarness();
