@@ -213,6 +213,7 @@ contract Rent2Repay is
         
         /// @dev Valorize values
         for (uint256 i = 0; i < len;) {
+            require(amounts[i] != type(uint256).max, "Inv Amount"); /// @dev to avoid max repay 
             require(tokens[i] != address(0) && $.tokenConfig[tokens[i]].active && amounts[i] > 0,
                 "Invalid token or amount");
             $.allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];

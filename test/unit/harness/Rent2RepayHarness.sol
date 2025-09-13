@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../../src/Rent2Repay.sol";
+import "../../../src/Rent2Repay.sol";
 
 /**
  * @title Rent2RepayHarness

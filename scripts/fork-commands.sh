@@ -7,7 +7,7 @@ echo "=== RENT2REPAY FORK TESTING COMMANDS ==="
 # Fonction pour exécuter les tests de fork
 run_fork_tests() {
     echo "Running fork tests..."
-    forge test --match-path test/Rent2RepayFork.t.sol --fork-url https://rpc.gnosischain.com -vvv
+    forge test --match-path "test/integration/*" --fork-url https://rpc.gnosischain.com -vvv
 }
 
 # Fonction pour exécuter le script de test simple
@@ -33,7 +33,7 @@ deploy_gnosis() {
 run_fork_tests_block() {
     local block_number=${1:-35000000}
     echo "Running fork tests at block $block_number..."
-    forge test --match-path test/Rent2RepayFork.t.sol --fork-url https://rpc.gnosischain.com --fork-block-number $block_number -vvv
+    forge test --match-path "test/integration/*" --fork-url https://rpc.gnosischain.com --fork-block-number $block_number -vvv
 }
 
 # Fonction pour exécuter un test spécifique

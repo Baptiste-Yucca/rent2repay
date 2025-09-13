@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
-import {Rent2Repay} from "../src/Rent2Repay.sol";
+import {Rent2Repay} from "../../src/Rent2Repay.sol";
 import {Rent2RepayV2} from "./mocks/Rent2RepayV2.sol";
 import {MockRMM} from "./mocks/MockRMM.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
