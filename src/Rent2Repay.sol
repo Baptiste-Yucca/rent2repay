@@ -375,7 +375,6 @@ contract Rent2Repay is
             );
         }
         /// @dev Note: Onlycase where RMM returns a different amount than the amountForRepayment is when amountForRepayment == max uint256
-
         actualAmountRepaid = $.rmm.repay(
             $.tokenConfig[token].token,
             amountForRepayment,
