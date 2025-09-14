@@ -6,9 +6,10 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20,IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRMM} from "interfaces/IRMM.sol";
 
+using SafeERC20 for IERC20;
 /**
  * @title Rent2Repay
  * @notice A contract that manages authorization for the Rent2Repay mechanism
@@ -337,10 +338,8 @@ contract Rent2Repay is
 
         (daoFees, senderTips, amountForRepayment) = _calculateFees(toTransfer, user);
 
-        require(
-            IERC20(token).transferFrom(user, address(this), toTransfer),
-            "transferFrom to R2R failed"
-        );
+       
+        IERC20(token).safeTransferFrom(user, address(this), toTransfer);
     }
 
     /**
@@ -552,11 +551,9 @@ contract Rent2Repay is
     {
         require(spender != address(0), "Invalid spender address");
         require(amount > 0, "Amount must be greater than 0");
-        
-        require(
-            IERC20(token).approve(spender, amount),
-            "Approval failed"
-        );
+        require(IERC20(token).approve(spender, amount), "Approval failed");
+        //IERC20(token).safeApprove(spender, amount);
+        //SafeERC20.safeApprove(IERC20(token), spender, amount);
     }
 
     /**
@@ -637,7 +634,7 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        require(IERC20(token).transfer(to, amount), "Transfer failed");
+        IERC20(token).safeTransfer(to, amount);
     }
 
     /**
@@ -764,14 +761,11 @@ contract Rent2Repay is
     function _transferFees(address token, uint256 daoFees, uint256 senderTips) internal {
         Rent2RepayStorage storage $ = _getR2rStorage();
         if (daoFees > 0 && $.daoTreasuryAddress != address(0)) {
-            require(
-                IERC20(token).transfer($.daoTreasuryAddress, daoFees), 
-                "Transfer to DAO failed"
-            );
+            IERC20(token).safeTransfer($.daoTreasuryAddress, daoFees);
         }
         
         if (senderTips > 0) {
-            require(IERC20(token).transfer(msg.sender, senderTips), "Transfer to sender failed");
+            IERC20(token).safeTransfer(msg.sender, senderTips);
         }
     }
 

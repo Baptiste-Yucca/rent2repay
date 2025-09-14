@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Rent2Repay} from "../../src/Rent2Repay.sol";
+import {IRMMtester} from "./interfaces/IRMMtester.sol";
+import {IAToken} from "./interfaces/IAToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -27,13 +29,16 @@ contract Rent2RepayForkTest is Test {
     Rent2Repay public rent2Repay;
     IERC20 public wxdai;
     IERC20 public usdc;
-    IERC20 public wxdaiSupply;
-    IERC20 public usdcSupply;
+    IAToken public wxdaiSupply;
+    IAToken public usdcSupply;
     IERC20 public daoGovernanceToken;
 
     function setUp() public {
         // Fork Gnosis
-        vm.createFork("https://rpc.gnosischain.com");
+        //vm.createFork("https://rpc.gnosischain.com");
+        uint256 forkId = vm.createFork("https://rpc.gnosischain.com");
+        vm.selectFork(forkId);
+
         
         console.log("=== FORK GNOSIS TEST SETUP ===");
         console.log("Forking Gnosis at block:", block.number);
@@ -42,8 +47,8 @@ contract Rent2RepayForkTest is Test {
         // Initialiser les interfaces des tokens
         wxdai = IERC20(WXDAI_TOKEN);
         usdc = IERC20(USDC_TOKEN);
-        wxdaiSupply = IERC20(WXDAI_SUPPLY_TOKEN);
-        usdcSupply = IERC20(USDC_SUPPLY_TOKEN);
+        wxdaiSupply = IAToken(WXDAI_SUPPLY_TOKEN);
+        usdcSupply = IAToken(USDC_SUPPLY_TOKEN);
         daoGovernanceToken = IERC20(DAO_GOVERNANCE_TOKEN);
         
         // Déployer Rent2Repay
@@ -312,8 +317,20 @@ contract Rent2RepayForkTest is Test {
         uint256 user2SupplyBalanceBefore = usdcSupply.balanceOf(TEST_USER2);
         uint256 daoTreasurySupplyBalanceBefore = usdcSupply.balanceOf(DAO_TREASURY);
         
-        // Vérifier que TEST_USER a des supply tokens
-        require(user1SupplyBalanceBefore > 0, "TEST_USER needs supply USDC tokens");
+        if (user1SupplyBalanceBefore == 0){
+            // Donner des USDC bruts au user (1000 USDC par ex.)
+            deal(USDC_TOKEN, TEST_USER, 1_000e6); // 6 décimales
+
+            // Approve et dépôt sur le RMM -> mint des aUSDC
+            vm.startPrank(TEST_USER);
+            IERC20(USDC_TOKEN).approve(RMM_ADDRESS, type(uint256).max);
+            IRMMtester(RMM_ADDRESS).supply(USDC_TOKEN, 500e6, TEST_USER, 0); // 500 USDC
+            vm.stopPrank();
+
+            // Vérifier qu'il a bien des supply tokens
+            user1SupplyBalanceBefore = usdcSupply.balanceOf(TEST_USER);
+            require(user1SupplyBalanceBefore > 0, "TEST_USER has no supply USDC tokens after setup");
+        }
         
         // Configuration pour TEST_USER avec supply USDC
         address[] memory tokens = new address[](1);

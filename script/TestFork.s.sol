@@ -118,7 +118,7 @@ contract TestForkScript is Script, Test {
         console.log("\n=== ALL TESTS COMPLETED ===");
     }
     
-    function _testInitialization() internal {
+    function _testInitialization() internal view {
         console.log("\n--- Testing Initialization ---");
         
         // Vérifier les rôles
@@ -138,7 +138,7 @@ contract TestForkScript is Script, Test {
         console.log("Initialization test passed");
     }
     
-    function _testAuthorizedTokens() internal {
+    function _testAuthorizedTokens() internal view {
         console.log("\n--- Testing Authorized Tokens ---");
         
         // Vérifier les tokens actifs
