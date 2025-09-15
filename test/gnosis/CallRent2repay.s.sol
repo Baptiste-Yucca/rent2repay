@@ -7,7 +7,6 @@ contract callR2Rscript is Script {
     function run() external {
         // Charger les adresses depuis l'environnement
         address proxyAddress = vm.envAddress("R2R_PROXY_ADDR");
-        address daoGovernanceToken = vm.envAddress("DAO_GOVERNENCE_TOKEN");
         
         // Vérifier que nous sommes sur Gnosis
         require(block.chainid == 100, "Gnosis chain");
@@ -19,9 +18,10 @@ contract callR2Rscript is Script {
         address user2 = vm.addr(user2_k);
         console.log("This BOT", user2);
         console.log("will call rent2repay for", user1);
-        address usdcSuppplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
+
+        //address usdcSuppplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
         address usdcAddr = vm.envAddress("USDC_TOKEN");
-        address wxdaiSuppyAddr = vm.envAddress("WXDAI_SUPPLY_TOKEN");
+        //address wxdaiSuppyAddr = vm.envAddress("WXDAI_SUPPLY_TOKEN");
        
         vm.startBroadcast(user2_k);
         

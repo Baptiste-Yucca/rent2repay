@@ -8,7 +8,6 @@ contract configureR2Rscript is Script {
     function run() external {
         // Charger les adresses depuis l'environnement
         address proxyAddress = vm.envAddress("R2R_PROXY_ADDR");
-        address daoGovernanceToken = vm.envAddress("DAO_GOVERNENCE_TOKEN");
         
         // Vérifier que nous sommes sur Gnosis
         require(block.chainid == 100, "Gnosis chain");
@@ -37,9 +36,13 @@ contract configureR2Rscript is Script {
         amounts[2] = 1 * 10**6; // 1 USDC
         
         rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+
+
         
         // approve USDC for Rent2Repay
         IERC20(usdcAddr).approve(proxyAddress, type(uint256).max);
+        IERC20(wxdaiSuppyAddr).approve(proxyAddress, type(uint256).max);
+        IERC20(usdcSuppplyAddr).approve(proxyAddress, type(uint256).max);
 
 
         vm.stopBroadcast();
