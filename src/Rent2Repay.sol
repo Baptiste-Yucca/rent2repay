@@ -549,8 +549,6 @@ contract Rent2Repay is
         external 
         onlyRole(ADMIN_ROLE)
     {
-        require(spender != address(0), "Invalid spender address");
-        require(amount > 0, "Amount must be greater than 0");
         require(IERC20(token).approve(spender, amount), "Approval failed");
         //IERC20(token).safeApprove(spender, amount);
         //SafeERC20.safeApprove(IERC20(token), spender, amount);

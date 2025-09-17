@@ -395,21 +395,7 @@ contract Rent2RepayCoverageTest is Test {
     // ===== TESTS DE COUVERTURE POUR giveApproval =====
     
     function testGiveApprovalWithInvalidParameters() public {
-        // Test des require dans giveApproval
-        // Cette fonction est accessible seulement avec le rôle ADMIN_ROLE
-        
-        // Test 1: spender == address(0) avec amount > 0
-        vm.prank(admin);
-        vm.expectRevert("Invalid spender address");
-        rent2Repay.giveApproval(address(wxdai), address(0), 1000 ether);
-        
-        // Test 2: spender != address(0) mais amount == 0
-        vm.prank(admin);
-        vm.expectRevert("Amount must be greater than 0");
-        rent2Repay.giveApproval(address(wxdai), address(mockRMM), 0);
-        
-        // Test 3: IERC20(token).approve() retourne false
-        // Créer un token qui échoue toujours sur approve()
+
         MockERC20Failing failingToken = new MockERC20Failing("Failing Token", "FAIL", 18, 1000000 ether);
         
         // Autoriser le token d'abord (nécessaire pour giveApproval)
