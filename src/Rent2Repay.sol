@@ -743,7 +743,6 @@ contract Rent2Repay is
      * @param senderTips The sender tips amount
      */
     function _transferFees(Rent2RepayStorage storage s, address token, uint256 daoFees, uint256 senderTips) internal {
-        Rent2RepayStorage storage $ = _getR2rStorage();
         if (daoFees > 0 && s.daoTreasuryAddress != address(0)) {
             IERC20(token).safeTransfer(s.daoTreasuryAddress, daoFees);
         }

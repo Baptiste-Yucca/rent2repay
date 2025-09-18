@@ -25,10 +25,10 @@ contract giveApprovalScript is Script {
         address wxdaiSupplyAddr = vm.envAddress("WXDAI_SUPPLY_TOKEN");
         address wxdaiAddr = vm.envAddress("WXDAI_TOKEN");
 
-        rent2Repay.giveApproval(usdcAddr, rmmAddress, type(uint256).max);
-        rent2Repay.giveApproval(wxdaiAddr, rmmAddress, type(uint256).max);
-        rent2Repay.giveApproval(wxdaiSupplyAddr, rmmAddress, type(uint256).max);
-        rent2Repay.giveApproval(usdcSupplyAddr, rmmAddress, type(uint256).max);
+        rent2Repay.giveApproval(usdcAddr, rmmAddress, 0); 
+        rent2Repay.giveApproval(wxdaiAddr, rmmAddress, 0); 
+        rent2Repay.giveApproval(wxdaiSupplyAddr, rmmAddress, 0);
+        rent2Repay.giveApproval(usdcSupplyAddr, rmmAddress, 0);
         
         console.log("Checking allowances RMM");
         uint256 allowance = IERC20(usdcAddr).allowance(proxyAddress, rmmAddress);
