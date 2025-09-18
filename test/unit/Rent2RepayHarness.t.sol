@@ -152,34 +152,7 @@ contract Rent2RepayHarnessTest is Test {
         assertTrue(rent2Repay.exposed_isNewPeriod(user, address(wxdai)), "Should be new period after 1 week + 1 second");
     }
 
-    function testExposedValidateUserAndToken() public {
-        // Test avec user non autorisé
-        vm.expectRevert("User not authorized");
-        rent2Repay.exposed_validateUserAndToken(user2, address(wxdai));
-        
-        // Configurer user pour rent2repay
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(wxdai);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 10 ether;
-        
-        vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 weeks, block.timestamp);
-        
-        // Test avec user configuré mais token non configuré
-        vm.expectRevert("User not configured for token");
-        rent2Repay.exposed_validateUserAndToken(user, address(usdc));
-        
-        // Test avec user configuré et token configuré mais période pas encore écoulée
-        vm.expectRevert("Wait next period");
-        rent2Repay.exposed_validateUserAndToken(user, address(wxdai));
-        
-        // Avancer le temps et tester avec tout configuré correctement
-        vm.warp(block.timestamp + 1 weeks + 1 seconds);
-        
-        // Cette fois ça devrait passer sans revert
-        rent2Repay.exposed_validateUserAndToken(user, address(wxdai));
-    }
+
 
     function testExposedTransferFees() public {
         // Donner des tokens au contrat pour les frais

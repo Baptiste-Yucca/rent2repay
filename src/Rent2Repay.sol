@@ -275,20 +275,6 @@ contract Rent2Repay is
     
 
     /**
-     * @notice Helper function to perform security checks and configuration validation
-     * @dev Validates user authorization and token configuration
-     * @param user The user address to validate
-     * @param token The token address to validate
-     */
-    function _validateUserAndToken(address user, address token) internal view {
-        Rent2RepayStorage storage $ = _getR2rStorage();
-        require($.lastRepayTimestamps[user] != 0, "User not authorized");
-        require($.allowedMaxAmounts[user][token] > 0, "User not configured for token");
-        require($.periodicity[user][token] > 0, "Periodicity not set");
-        require(_isNewPeriod(user, token), "Wait next period");
-    }
-
-    /**
      * @notice Internal function to process a single user repayment
      * @dev Contains the common logic for both rent2repay and batchRent2Repay
      * @param user The user address to process repayment for
@@ -297,24 +283,26 @@ contract Rent2Repay is
      * @return senderTips The sender tips amount
      * @return actualAmountRepaid The actual amount repaid to RMM
      */
-    function _processUserRepayment(address user, address token) 
+    function _processUserRepayment(Rent2RepayStorage storage s, address user, address token) 
         internal 
         returns (uint256 adjustedDaoFees, uint256 senderTips, uint256 actualAmountRepaid) 
     {
-        Rent2RepayStorage storage $ = _getR2rStorage();
-        _validateUserAndToken(user, token);
+        require(s.lastRepayTimestamps[user] != 0, "User not authorized");
+        require(s.allowedMaxAmounts[user][token] > 0, "User not configured for token");
+        require(s.periodicity[user][token] > 0, "Periodicity not set");
+        require(_isNewPeriod(user, token), "Wait next period");
         
         /// @dev Step 1: Calculate and transfer tokens
         uint256 daoFees;
         uint256 amountForRepayment;
-        (daoFees, senderTips, amountForRepayment) = _handleTokenTransferAndFees(user, token);
+        (daoFees, senderTips, amountForRepayment) = _handleTokenTransferAndFees(s, user, token);
         
         /// @dev Step 2: Perform RMM repayment and adjust fees
         (actualAmountRepaid, adjustedDaoFees) = _handleRmmRepayment(
-            user, token, daoFees, amountForRepayment
+            s, user, token, daoFees, amountForRepayment
         );
         
-        $.lastRepayTimestamps[user] = block.timestamp;
+        s.lastRepayTimestamps[user] = block.timestamp;
         /// @dev No emit, transfer ERC20, track them from TheGraph
     }
 
@@ -327,16 +315,15 @@ contract Rent2Repay is
      * @return senderTips The calculated sender tips
      * @return amountForRepayment The amount to be used for repayment
      */
-    function _handleTokenTransferAndFees(address user, address token) 
+    function _handleTokenTransferAndFees(Rent2RepayStorage storage s, address user, address token) 
         internal 
         returns (uint256 daoFees, uint256 senderTips, uint256 amountForRepayment) 
     {
-        Rent2RepayStorage storage $ = _getR2rStorage();
-        uint256 amount = $.allowedMaxAmounts[user][token];
+        uint256 amount = s.allowedMaxAmounts[user][token];
         uint256 balance = IERC20(token).balanceOf(user);
         uint256 toTransfer = balance < amount ? balance : amount;
 
-        (daoFees, senderTips, amountForRepayment) = _calculateFees(toTransfer, user);
+        (daoFees, senderTips, amountForRepayment) = _calculateFees(s, toTransfer, user);
 
        
         IERC20(token).safeTransferFrom(user, address(this), toTransfer);
@@ -353,6 +340,7 @@ contract Rent2Repay is
      * @return adjustedDaoFees The DAO fees after adjustment for any difference
      */
     function _handleRmmRepayment(
+        Rent2RepayStorage storage s,
         address user, 
         address token, 
         uint256 daoFees,
@@ -361,13 +349,12 @@ contract Rent2Repay is
         internal 
         returns (uint256 actualAmountRepaid, uint256 adjustedDaoFees) 
     {
-        Rent2RepayStorage storage $ = _getR2rStorage();
 
-        if($.tokenConfig[token].supplyToken == token) {
+        if(s.tokenConfig[token].supplyToken == token) {
             /// @dev Note: if fail, revert all
             require(
-                $.rmm.withdraw(
-                    $.tokenConfig[token].token, 
+                s.rmm.withdraw(
+                    s.tokenConfig[token].token, 
                     amountForRepayment, 
                     address(this)
                 ) == amountForRepayment, 
@@ -375,10 +362,10 @@ contract Rent2Repay is
             );
         }
         /// @dev Note: Onlycase where RMM returns a different amount than the amountForRepayment is when amountForRepayment == max uint256
-        actualAmountRepaid = $.rmm.repay(
-            $.tokenConfig[token].token,
+        actualAmountRepaid = s.rmm.repay(
+            s.tokenConfig[token].token,
             amountForRepayment,
-            $.defaultInterestRateMode,
+            s.defaultInterestRateMode,
             user
         );
 
@@ -388,27 +375,27 @@ contract Rent2Repay is
     function rent2repay(address user, address token) 
         external 
         whenNotPaused
-        validTokenAddress(token)
         onlyAuthorizedToken(token)
         nonReentrant
     {
+        Rent2RepayStorage storage s = _getR2rStorage();
         (
             uint256 adjustedDaoFees,
             uint256 senderTips,
             
-        ) = _processUserRepayment(user, token);
+        ) = _processUserRepayment(s, user, token);
 
         /// @dev Transfer fees to respective addresses
-        _transferFees(token, adjustedDaoFees, senderTips);
+        _transferFees(s, token, adjustedDaoFees, senderTips);
     }
 
     function batchRent2Repay(address[] calldata users, address token) 
         external 
         whenNotPaused
-        validTokenAddress(token)
         onlyAuthorizedToken(token)
         nonReentrant
     {
+        Rent2RepayStorage storage s = _getR2rStorage();
         uint256 totalDaoFees;
         uint256 totalSenderTips;
         uint256 adjustedDaoFees;
@@ -424,7 +411,7 @@ contract Rent2Repay is
                 adjustedDaoFees,
                 senderTips,
                 
-            ) = _processUserRepayment(user, token);
+            ) = _processUserRepayment(s, user, token);
 
             totalDaoFees += adjustedDaoFees;
             totalSenderTips += senderTips;
@@ -433,7 +420,7 @@ contract Rent2Repay is
         }
         
         if (totalDaoFees > 0 || totalSenderTips > 0) {
-            _transferFees(token, totalDaoFees, totalSenderTips);
+            _transferFees(s, token, totalDaoFees, totalSenderTips);
         }
     }
 
@@ -594,21 +581,20 @@ contract Rent2Repay is
      * @return senderTips The sender tips amount
      * @return amountForRepayment The amount remaining for repayment
      */
-    function _calculateFees(uint256 amount, address user) internal view returns (
+    function _calculateFees(Rent2RepayStorage storage s, uint256 amount, address user) internal view returns (
         uint256 daoFees,
         uint256 senderTips,
         uint256 amountForRepayment
     ) {
-        Rent2RepayStorage storage $ = _getR2rStorage();
         /// @dev Calculate base fees
-        daoFees = (amount * $.daoFeesBps) / 10000;
-        senderTips = (amount * $.senderTipsBps) / 10000;
+        daoFees = (amount * s.daoFeesBps) / 10000;
+        senderTips = (amount * s.senderTipsBps) / 10000;
 
-        if ($.daoFeeReductionToken != address(0) && $.daoFeeReductionMinimumAmount > 0) {
-            uint256 userBalance = IERC20($.daoFeeReductionToken).balanceOf(user);
-            if (userBalance >= $.daoFeeReductionMinimumAmount) {
+        if (s.daoFeeReductionToken != address(0) && s.daoFeeReductionMinimumAmount > 0) {
+            uint256 userBalance = IERC20(s.daoFeeReductionToken).balanceOf(user);
+            if (userBalance >= s.daoFeeReductionMinimumAmount) {
                 /// @dev Reduce DAO fees by the configured percentage (BPS)
-                uint256 reductionAmount = (daoFees * $.daoFeeReductionBps) / 10000;
+                uint256 reductionAmount = (daoFees * s.daoFeeReductionBps) / 10000;
                 daoFees = daoFees - reductionAmount;
             }
         }
@@ -756,10 +742,10 @@ contract Rent2Repay is
      * @param daoFees The DAO fees amount
      * @param senderTips The sender tips amount
      */
-    function _transferFees(address token, uint256 daoFees, uint256 senderTips) internal {
+    function _transferFees(Rent2RepayStorage storage s, address token, uint256 daoFees, uint256 senderTips) internal {
         Rent2RepayStorage storage $ = _getR2rStorage();
-        if (daoFees > 0 && $.daoTreasuryAddress != address(0)) {
-            IERC20(token).safeTransfer($.daoTreasuryAddress, daoFees);
+        if (daoFees > 0 && s.daoTreasuryAddress != address(0)) {
+            IERC20(token).safeTransfer(s.daoTreasuryAddress, daoFees);
         }
         
         if (senderTips > 0) {

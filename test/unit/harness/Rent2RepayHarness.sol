@@ -10,6 +10,20 @@ import "../../../src/Rent2Repay.sol";
  */
 contract Rent2RepayHarness is Rent2Repay {
     
+
+    /// @dev Local copy du getter storage - same as the main contract
+    /// @dev can oly be used to  coverage tests
+    function _getHarnessStorage()
+        private
+        pure
+        returns (Rent2RepayStorage storage s)
+    {
+        assembly {
+            s.slot := 0x52C63247E1F47d19d5ce046630c49f7C67dcaEcfb71ba98eedaab2ebca6e0
+        }
+    }
+
+
     /**
      * @notice Exposes the internal _transferFees function for testing
      * @param token The token address
@@ -17,7 +31,8 @@ contract Rent2RepayHarness is Rent2Repay {
      * @param senderTips The sender tips amount
      */
     function exposed_transferFees(address token, uint256 daoFees, uint256 senderTips) external {
-        _transferFees(token, daoFees, senderTips);
+        Rent2RepayStorage storage s = _getHarnessStorage();
+        _transferFees(s, token, daoFees, senderTips);
     }
 
     /**
@@ -32,7 +47,8 @@ contract Rent2RepayHarness is Rent2Repay {
         external
         returns (uint256 adjustedDaoFees, uint256 senderTips, uint256 actualAmountRepaid)
     {
-        return _processUserRepayment(user, token);
+        Rent2RepayStorage storage s = _getHarnessStorage();
+        return _processUserRepayment(s, user, token);
     }
 
     /**
@@ -47,7 +63,8 @@ contract Rent2RepayHarness is Rent2Repay {
         external
         returns (uint256 daoFees, uint256 senderTips, uint256 amountForRepayment)
     {
-        return _handleTokenTransferAndFees(user, token);
+        Rent2RepayStorage storage s = _getHarnessStorage();
+        return _handleTokenTransferAndFees(s, user, token);
     }
 
     /**
@@ -68,7 +85,8 @@ contract Rent2RepayHarness is Rent2Repay {
         external
         returns (uint256 actualAmountRepaid, uint256 adjustedDaoFees)
     {
-        return _handleRmmRepayment(user, token, daoFees, amountForRepayment);
+        Rent2RepayStorage storage s = _getHarnessStorage();
+        return _handleRmmRepayment(s, user, token, daoFees, amountForRepayment);
     }
 
     /**
@@ -84,7 +102,8 @@ contract Rent2RepayHarness is Rent2Repay {
         view
         returns (uint256 daoFees, uint256 senderTips, uint256 amountForRepayment)
     {
-        return _calculateFees(amount, user);
+        Rent2RepayStorage storage s = _getHarnessStorage();
+        return _calculateFees(s, amount, user);
     }
 
     /**
@@ -97,14 +116,6 @@ contract Rent2RepayHarness is Rent2Repay {
         return _isNewPeriod(_user, _token);
     }
 
-    /**
-     * @notice Exposes the internal _validateUserAndToken function for testing
-     * @param user The user address to validate
-     * @param token The token address to validate
-     */
-    function exposed_validateUserAndToken(address user, address token) external view {
-        _validateUserAndToken(user, token);
-    }
 
     /**
      * @notice Exposes the internal _removeUserAllTokens function for testing

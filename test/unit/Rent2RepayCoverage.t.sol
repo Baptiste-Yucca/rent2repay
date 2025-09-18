@@ -108,30 +108,6 @@ contract Rent2RepayCoverageTest is Test {
         vm.prank(admin);
         rent2Repay.updateDaoFeeReductionPercentage(5000); // 50% de réduction des frais DAO
     }
-
-    // ===== TESTS DE COUVERTURE POUR LES MODIFIERS =====
-    
-    function testRent2RepayWithZeroAddressToken() public {
-        // Test du modifier validTokenAddress avec token == address(0)
-        // Ce test doit reverter avec InvalidTokenAddress()
-        
-        // Configurer user pour rent2repay d'abord
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(wxdai);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 10 ether;
-        
-        vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
-        
-        // Avancer le temps pour respecter la périodicité
-        vm.warp(block.timestamp + 2 seconds);
-        
-        // Tester rent2repay avec address(0) - doit reverter
-        vm.prank(user2);
-        vm.expectRevert(Rent2Repay.InvalidTokenAddress.selector);
-        rent2Repay.rent2repay(user, address(0));
-    }
     
     function testValidTokenAddressModifierWithValidToken() public {
         // Test du modifier validTokenAddress avec token valide (non-zero address)
@@ -142,29 +118,6 @@ contract Rent2RepayCoverageTest is Test {
         rent2Repay.updateDaoFeeReductionToken(address(daoGovernanceToken));
         
         console.log("SUCCESS: validTokenAddress modifier with valid token - branch false covered");
-    }
-    
-    function testBatchRent2RepayWithZeroAddressToken() public {
-        // Test du modifier validTokenAddress avec batchRent2Repay
-        // Configurer user pour rent2repay d'abord
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(wxdai);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 10 ether;
-        
-        vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
-        
-        // Avancer le temps pour respecter la périodicité
-        vm.warp(block.timestamp + 2 seconds);
-        
-        // Tester batchRent2Repay avec address(0) - doit reverter
-        address[] memory users = new address[](1);
-        users[0] = user;
-        
-        vm.prank(operator);
-        vm.expectRevert(Rent2Repay.InvalidTokenAddress.selector);
-        rent2Repay.batchRent2Repay(users, address(0));
     }
     
     function testRent2RepayWithUnauthorizedToken() public {
