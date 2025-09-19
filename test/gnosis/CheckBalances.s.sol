@@ -18,20 +18,10 @@ contract checkBalancesScript is Script {
 
         address usdcSupplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
         address usdcAddr = vm.envAddress("USDC_TOKEN");
-        address wxdaiSupplyAddr = vm.envAddress("WXDAI_SUPPLY_TOKEN");
-        address wxdaiAddr = vm.envAddress("USDC_DEBT_TOKEN");
         address usdcDebtAddr = vm.envAddress("USDC_DEBT_TOKEN");
        
         vm.startBroadcast(user1_k);
         
-        // Créer une instance du contrat via le proxy
-        Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
-
-
-        //IERC20(usdcAddr).approve(proxyAddress, type(uint256).max);
-        //IERC20(wxdaiSupplyAddr).approve(proxyAddress, type(uint256).max);
-        //IERC20(usdcSupplyAddr).approve(proxyAddress, type(uint256).max);
-
         console.log("USER1 Checking balances R2R");
         uint256 balance = IERC20(usdcAddr).balanceOf(user1);
         console.log("Allowance USDC:", balance);

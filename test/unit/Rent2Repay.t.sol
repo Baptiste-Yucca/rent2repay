@@ -58,16 +58,22 @@ contract Rent2RepayTest is Test {
         Rent2Repay implementation = new Rent2Repay();
         
         // 2. Préparer les données d'initialisation
+        Rent2Repay.InitConfig memory cfg = Rent2Repay.InitConfig({
+            admin: admin,
+            emergency: emergency,
+            operator: operator,
+            rmm: address(mockRMM),
+            wxdaiToken: address(wxdai),
+            wxdaiArmmToken: address(wxdaiSupply),
+            wxdaiDebtToken: address(0), // Si pas utilisé dans les tests
+            usdcToken: address(usdc),
+            usdcArmmToken: address(usdcSupply),
+            usdcDebtToken: address(0)   // Si pas utilisé dans les tests
+        });
+
         bytes memory initData = abi.encodeWithSelector(
             Rent2Repay.initialize.selector,
-            admin,
-            emergency,
-            operator,
-            address(mockRMM),
-            address(wxdai),           // wxdaiToken
-            address(wxdaiSupply),     // wxdaiArmmToken
-            address(usdc),            // usdcToken
-            address(usdcSupply)       // usdcArmmToken
+            cfg
         );
         
         // 3. Deploy le proxy avec l'implémentation
@@ -462,9 +468,10 @@ contract Rent2RepayTest is Test {
         // Test authorizeTokenPair par admin
         address newToken = address(0x999);
         address newSupplyToken = address(0x888);
+        address newDebtToken = address(0xaaa);
         
         vm.prank(admin);
-        rent2Repay.authorizeTokenPair(newToken, newSupplyToken);
+        rent2Repay.authorizeTokenPair(newToken, newSupplyToken, newDebtToken);
         
         // Vérifier que le token est maintenant actif
         address[] memory tokensAfterAdd = rent2Repay.getActiveTokens();
@@ -479,7 +486,7 @@ contract Rent2RepayTest is Test {
         // Test que seul admin peut autoriser des tokens
         vm.prank(user);
         vm.expectRevert();
-        rent2Repay.authorizeTokenPair(address(0x777), address(0x666));
+        rent2Repay.authorizeTokenPair(address(0x777), address(0x666), address(0x555));
         
         // Test unauthorizeToken par admin
         vm.prank(admin);
@@ -732,15 +739,15 @@ contract Rent2RepayTest is Test {
         // authorizeTokenPair - seul ADMIN
         vm.prank(operator);
         vm.expectRevert();
-        rent2Repay.authorizeTokenPair(address(0x123), address(0x456));
+        rent2Repay.authorizeTokenPair(address(0x123), address(0x456), address(0x789));
         
         vm.prank(emergency);
         vm.expectRevert();
-        rent2Repay.authorizeTokenPair(address(0x123), address(0x456));
+        rent2Repay.authorizeTokenPair(address(0x123), address(0x456), address(0x789));
         
         vm.prank(user);
         vm.expectRevert();
-        rent2Repay.authorizeTokenPair(address(0x123), address(0x456));
+        rent2Repay.authorizeTokenPair(address(0x123), address(0x456), address(0x789));
         
         // unauthorizeToken - seul ADMIN
         vm.prank(operator);
@@ -934,7 +941,8 @@ contract Rent2RepayTest is Test {
         
         // Créer des tokens de test (USDT et sa paire)
         MockERC20 usdt = new MockERC20("Tether USD", "USDT", 6, 1000000 * 10**6);
-        MockERC20 usdtSupply = new MockERC20("USDT Supply", "aUSDT", 6, 1000000 * 10**6);
+        MockERC20 usdtSupply = new MockERC20("USDT Supply", "aUSDT", 6, 1000000 * 10**6);   
+        MockERC20 usdtDebt = new MockERC20("USDT Debt", "vUSDT", 6, 1000000 * 10**6);
         
         // ===== TEST INITIAL : USDT n'est pas présent =====
         Rent2Repay.TokenConfig memory config = rent2Repay.tokenConfig(address(usdt));
@@ -944,7 +952,7 @@ contract Rent2RepayTest is Test {
         
         // ===== TEST authorizeTokenPair =====
         vm.prank(admin);
-        rent2Repay.authorizeTokenPair(address(usdt), address(usdtSupply));
+        rent2Repay.authorizeTokenPair(address(usdt), address(usdtSupply), address(usdtDebt));
         
         // Vérifier que la paire a été ajoutée
         config = rent2Repay.tokenConfig(address(usdt));

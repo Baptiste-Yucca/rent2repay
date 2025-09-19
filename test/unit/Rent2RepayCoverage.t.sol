@@ -58,16 +58,22 @@ contract Rent2RepayCoverageTest is Test {
         Rent2Repay implementation = new Rent2Repay();
         
         // 2. Préparer les données d'initialisation
+        Rent2Repay.InitConfig memory cfg = Rent2Repay.InitConfig({
+            admin: admin,
+            emergency: emergency,
+            operator: operator,
+            rmm: address(mockRMM),
+            wxdaiToken: address(wxdai),
+            wxdaiArmmToken: address(wxdaiSupply),
+            wxdaiDebtToken: address(0), // Si pas utilisé dans les tests
+            usdcToken: address(usdc),
+            usdcArmmToken: address(usdcSupply),
+            usdcDebtToken: address(0)   // Si pas utilisé dans les tests
+        });
+
         bytes memory initData = abi.encodeWithSelector(
             Rent2Repay.initialize.selector,
-            admin,
-            emergency,
-            operator,
-            address(mockRMM),
-            address(wxdai),           // wxdaiToken
-            address(wxdaiSupply),     // wxdaiArmmToken
-            address(usdc),            // usdcToken
-            address(usdcSupply)       // usdcArmmToken
+            cfg
         );
         
         // 3. Deploy le proxy avec l'implémentation
@@ -353,7 +359,7 @@ contract Rent2RepayCoverageTest is Test {
         
         // Autoriser le token d'abord (nécessaire pour giveApproval)
         vm.prank(admin);
-        rent2Repay.authorizeTokenPair(address(failingToken), address(failingToken));
+        rent2Repay.authorizeTokenPair(address(failingToken), address(failingToken), address(0x123));
         
         // Tester giveApproval avec le token qui échoue
         vm.prank(admin);
@@ -387,10 +393,11 @@ contract Rent2RepayCoverageTest is Test {
         // Créer un nouveau token pour le test
         MockERC20 testToken = new MockERC20("Test Token", "TEST", 18, 1000000 ether);
         MockERC20 testSupplyToken = new MockERC20("Test Supply", "aTEST", 18, 1000000 ether);
+        MockERC20 debtToken = new MockERC20("Test Debt", "vTEST", 18, 1000000 ether);
         
         // Ajouter le token (il sera actif par défaut)
         vm.prank(admin);
-        rent2Repay.authorizeTokenPair(address(testToken), address(testSupplyToken));
+        rent2Repay.authorizeTokenPair(address(testToken), address(testSupplyToken), address(debtToken));
         
         // Vérifier que le token est maintenant dans la liste des tokens actifs
         address[] memory tokensAfterAdd = rent2Repay.getActiveTokens();

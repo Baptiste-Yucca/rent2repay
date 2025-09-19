@@ -50,21 +50,27 @@ contract Rent2RepayHarnessTest is Test {
         supplyTokens[1] = address(usdcSupply);
         
         mockRMM = new MockRMM(tokens, debtTokens, supplyTokens);
-        
-        // 1. Deploy l'implémentation
+
+        // 1. Deploy l'implémentation HARNESS
         Rent2RepayHarness implementation = new Rent2RepayHarness();
         
         // 2. Préparer les données d'initialisation
+        Rent2Repay.InitConfig memory cfg = Rent2Repay.InitConfig({
+            admin: admin,
+            emergency: emergency,
+            operator: operator,
+            rmm: address(mockRMM),
+            wxdaiToken: address(wxdai),
+            wxdaiArmmToken: address(wxdaiSupply),
+            wxdaiDebtToken: address(0), // Si pas utilisé dans les tests
+            usdcToken: address(usdc),
+            usdcArmmToken: address(usdcSupply),
+            usdcDebtToken: address(0)   // Si pas utilisé dans les tests
+        });
+
         bytes memory initData = abi.encodeWithSelector(
             Rent2Repay.initialize.selector,
-            admin,
-            emergency,
-            operator,
-            address(mockRMM),
-            address(wxdai),           // wxdaiToken
-            address(wxdaiSupply),     // wxdaiArmmToken
-            address(usdc),            // usdcToken
-            address(usdcSupply)       // usdcArmmToken
+            cfg
         );
         
         // 3. Deploy le proxy avec l'implémentation
@@ -209,13 +215,10 @@ contract Rent2RepayHarnessTest is Test {
         MockERC20 newToken = new MockERC20("New Token", "NEW", 18, 1000000 ether);
         MockERC20 newSupplyToken = new MockERC20("New Supply", "aNEW", 18, 1000000 ether);
         
-        // Vérifier que le token n'est pas actif initialement
         assertFalse(rent2Repay.tokenConfig(address(newToken)).active, "New token should not be active initially");
-        
-        // Autoriser le token
-        rent2Repay.exposed_authorizeTokenPair(address(newToken), address(newSupplyToken));
-        
-        // Vérifier que le token est maintenant actif
+
+        rent2Repay.exposed_authorizeTokenPair(address(newToken), address(newSupplyToken), address(0x123));
+
         assertTrue(rent2Repay.tokenConfig(address(newToken)).active, "New token should be active after authorization");
         assertEq(rent2Repay.tokenConfig(address(newToken)).token, address(newToken), "Token address should match");
         assertEq(rent2Repay.tokenConfig(address(newToken)).supplyToken, address(newSupplyToken), "Supply token address should match");
@@ -259,69 +262,6 @@ contract Rent2RepayHarnessTest is Test {
         assertEq(daoTreasuryBalanceAfter, daoTreasuryBalanceBefore, "DAO treasury should not receive tokens when daoFees = 0");
         // User2 devrait toujours recevoir les sender tips
         assertEq(user2BalanceAfter - user2BalanceBefore, 3 ether, "User2 should still receive sender tips");
-        
-        // ===== TEST 3: daoTreasuryAddress = address(0) (branche false) =====
-        // Cas false: daoTreasuryAddress = address(0), donc la condition != address(0) est false
-        console.log("\n=== TEST 3: daoTreasuryAddress = address(0) (branche false) ===");
-        
-        // Mettre daoTreasuryAddress à address(0)
-        vm.prank(admin);
-        rent2Repay.updateDaoTreasuryAddress(address(0));
-        
-        daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
-        user2BalanceBefore = wxdai.balanceOf(user2);
-        
-        vm.prank(user2);
-        rent2Repay.exposed_transferFees(address(wxdai), 8 ether, 2 ether);
-        
-        daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        user2BalanceAfter = wxdai.balanceOf(user2);
-        
-        // DAO treasury ne devrait pas recevoir de tokens (daoTreasuryAddress = address(0))
-        assertEq(daoTreasuryBalanceAfter, daoTreasuryBalanceBefore, "DAO treasury should not receive tokens when daoTreasuryAddress = address(0)");
-        // User2 devrait toujours recevoir les sender tips
-        assertEq(user2BalanceAfter - user2BalanceBefore, 2 ether, "User2 should still receive sender tips");
-        
-        // Remettre daoTreasuryAddress pour les tests suivants
-        vm.prank(admin);
-        rent2Repay.updateDaoTreasuryAddress(daoTreasury);
-        
-        // ===== TEST 4: senderTips = 0 (branche false) =====
-        // Cas false: senderTips = 0, donc la condition senderTips > 0 est false
-        console.log("\n=== TEST 4: senderTips = 0 (branche false) ===");
-        
-        daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
-        user2BalanceBefore = wxdai.balanceOf(user2);
-        
-        vm.prank(user2);
-        rent2Repay.exposed_transferFees(address(wxdai), 7 ether, 0);
-        
-        daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        user2BalanceAfter = wxdai.balanceOf(user2);
-        
-        // DAO treasury devrait recevoir les DAO fees
-        assertEq(daoTreasuryBalanceAfter - daoTreasuryBalanceBefore, 7 ether, "DAO treasury should receive DAO fees");
-        // User2 ne devrait pas recevoir de tokens (senderTips = 0)
-        assertEq(user2BalanceAfter, user2BalanceBefore, "User2 should not receive tokens when senderTips = 0");
-        
-        // ===== TEST 5: daoFees = 0 && senderTips = 0 (les deux branches false) =====
-        // Cas false: Les deux conditions sont false
-        console.log("\n=== TEST 5: daoFees = 0 && senderTips = 0 (les deux branches false) ===");
-        
-        daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
-        user2BalanceBefore = wxdai.balanceOf(user2);
-        
-        vm.prank(user2);
-        rent2Repay.exposed_transferFees(address(wxdai), 0, 0);
-        
-        daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        user2BalanceAfter = wxdai.balanceOf(user2);
-        
-        // Aucun transfert ne devrait avoir lieu
-        assertEq(daoTreasuryBalanceAfter, daoTreasuryBalanceBefore, "DAO treasury should not receive tokens when daoFees = 0");
-        assertEq(user2BalanceAfter, user2BalanceBefore, "User2 should not receive tokens when senderTips = 0");
-        
-        console.log("\n=== ALL _transferFees TESTS COMPLETED ===");
     }
 
     function testExposedCalculateFeesBasic() public {

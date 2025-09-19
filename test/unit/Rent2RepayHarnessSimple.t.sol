@@ -15,8 +15,10 @@ contract Rent2RepayHarnessSimpleTest is Test {
     MockERC20 public usdc;
     MockERC20 public wxdaiSupply;
     MockERC20 public usdcSupply;
+    MockERC20 public wxdaiDebt;
+    MockERC20 public usdcDebt;
     MockERC20 public daoGovernanceToken;
-    
+
     address public admin = address(0x1);
     address public emergency = address(0x2);
     address public operator = address(0x3);
@@ -30,10 +32,8 @@ contract Rent2RepayHarnessSimpleTest is Test {
         wxdaiSupply = new MockERC20("WXDAI Supply", "aWXDAI", 18, 1000000 ether);
         usdcSupply = new MockERC20("USDC Supply", "aUSDC", 6, 1000000 * 10**6);
         daoGovernanceToken = new MockERC20("DAO Governance", "DAO", 18, 1000000 ether);
-        
-        // Créer les debt tokens
-        MockERC20 wxdaiDebt = new MockERC20("WXDAI Debt", "dWXDAI", 18, 1000000 ether);
-        MockERC20 usdcDebt = new MockERC20("USDC Debt", "dUSDC", 6, 1000000 * 10**6);
+        wxdaiDebt = new MockERC20("WXDAI Debt", "dWXDAI", 18, 1000000 ether);
+        usdcDebt = new MockERC20("USDC Debt", "dUSDC", 6, 1000000 * 10**6);
         
         // Configurer le MockRMM
         address[] memory tokens = new address[](2);
@@ -52,12 +52,26 @@ contract Rent2RepayHarnessSimpleTest is Test {
         
         // Deploy avec proxy normal
         Rent2RepayHarness implementation = new Rent2RepayHarness();
+        
+        // 2. Préparer les données d'initialisation
+        Rent2Repay.InitConfig memory cfg = Rent2Repay.InitConfig({
+            admin: admin,
+            emergency: emergency,
+            operator: operator,
+            rmm: address(mockRMM),
+            wxdaiToken: address(wxdai),
+            wxdaiArmmToken: address(wxdaiSupply),
+            wxdaiDebtToken: address(wxdaiDebt), // Si pas utilisé dans les tests
+            usdcToken: address(usdc),
+            usdcArmmToken: address(usdcSupply),
+            usdcDebtToken: address(usdcDebt)   // Si pas utilisé dans les tests
+        });
+
         bytes memory initData = abi.encodeWithSelector(
             Rent2Repay.initialize.selector,
-            admin, emergency, operator, address(mockRMM),
-            address(wxdai), address(wxdaiSupply),
-            address(usdc), address(usdcSupply)
+            cfg
         );
+        
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
         rent2Repay = Rent2RepayHarness(address(proxy));
         
@@ -85,14 +99,25 @@ contract Rent2RepayHarnessSimpleTest is Test {
     }
 
     
-    function testCalculateFeesWithValidFees() public {
+    function testCalculateFeesWithValidFeesDaoTreasury0() public {
         // Créer un nouveau contrat avec des frais valides pour comparaison
         Rent2RepayHarness implementation2 = new Rent2RepayHarness();
+        Rent2Repay.InitConfig memory cfg2 = Rent2Repay.InitConfig({
+            admin: admin,
+            emergency: emergency,
+            operator: operator,
+            rmm: address(mockRMM),
+            wxdaiToken: address(wxdai),
+            wxdaiArmmToken: address(wxdaiSupply),
+            wxdaiDebtToken: address(wxdaiDebt),
+            usdcToken: address(usdc),
+            usdcArmmToken: address(usdcSupply),
+            usdcDebtToken: address(usdcDebt)
+        });
+
         bytes memory initData2 = abi.encodeWithSelector(
             Rent2Repay.initialize.selector,
-            admin, emergency, operator, address(mockRMM),
-            address(wxdai), address(wxdaiSupply),
-            address(usdc), address(usdcSupply)
+            cfg2
         );
         ERC1967Proxy proxy2 = new ERC1967Proxy(address(implementation2), initData2);
         Rent2RepayHarness rent2RepayValid = Rent2RepayHarness(address(proxy2));
@@ -118,11 +143,77 @@ contract Rent2RepayHarnessSimpleTest is Test {
         (uint256 daoFees, uint256 senderTips, uint256 amountForRepayment) = 
             rent2RepayValid.exposed_calculateFees(amount, user);
         
+        ( , , , address daoTreasuryAddress) = rent2RepayValid.getDaoFeeReductionConfiguration();
+        console.log("DAO treasury address:", daoTreasuryAddress);
         console.log("DAO fees:", daoFees);
         console.log("Sender tips:", senderTips);
         console.log("Amount for repayment:", amountForRepayment);
         
         // Vérifier que le calcul est correct
+        assertEq(daoTreasuryAddress, address(0), "DAO treasury address should be 0");
+        assertEq(daoFees, 0, "DAO fees should be 0");
+        assertGt(senderTips, 0, "Sender tips should be > 0");
+        assertLt(amountForRepayment, amount, "Amount for repayment should be < total");
+        assertEq(daoFees + senderTips + amountForRepayment, amount, "Total should equal amount");
+        
+        console.log("SUCCESS: _calculateFees worked correctly with valid fees");
+        console.log("COVERAGE: Branche 'totalFees <= amount' testee avec succes !");
+    }
+
+    function testCalculateFeesWithValidFees() public {
+        // Créer un nouveau contrat avec des frais valides pour comparaison
+        Rent2RepayHarness implementation2 = new Rent2RepayHarness();
+        Rent2Repay.InitConfig memory cfg2 = Rent2Repay.InitConfig({
+            admin: admin,
+            emergency: emergency,
+            operator: operator,
+            rmm: address(mockRMM),
+            wxdaiToken: address(wxdai),
+            wxdaiArmmToken: address(wxdaiSupply),
+            wxdaiDebtToken: address(wxdaiDebt),
+            usdcToken: address(usdc),
+            usdcArmmToken: address(usdcSupply),
+            usdcDebtToken: address(usdcDebt)
+        });
+
+        bytes memory initData2 = abi.encodeWithSelector(
+            Rent2Repay.initialize.selector,
+            cfg2
+        );
+        ERC1967Proxy proxy2 = new ERC1967Proxy(address(implementation2), initData2);
+        Rent2RepayHarness rent2RepayValid = Rent2RepayHarness(address(proxy2));
+        
+        // Définir des frais valides
+        vm.prank(admin);
+        rent2RepayValid.updateDaoFees(5000); // 50% DAO fees
+        vm.prank(admin);
+        rent2RepayValid.updateSenderTips(3000); // 30% sender tips
+        // Total: 50% + 30% = 80% < 100% - VALIDE
+        vm.prank(admin);
+        rent2RepayValid.updateDaoTreasuryAddress(daoTreasury);
+        
+        uint256 amount = 100 ether;
+        
+        console.log("\n=== TEST: totalFees < amount (cas valide) ===");
+        console.log("DAO fees BPS:", rent2RepayValid.daoFeesBps());
+        console.log("Sender tips BPS:", rent2RepayValid.senderTipsBps());
+        console.log("Total BPS:", rent2RepayValid.daoFeesBps() + rent2RepayValid.senderTipsBps());
+        
+        // Vérifier que les frais sont < 100%
+        assertLt(rent2RepayValid.daoFeesBps() + rent2RepayValid.senderTipsBps(), 10000, "Total fees should be < 100%");
+        
+        // Tester _calculateFees avec des frais valides
+        (uint256 daoFees, uint256 senderTips, uint256 amountForRepayment) = 
+            rent2RepayValid.exposed_calculateFees(amount, user);
+
+        ( , , , address daoTreasuryAddress) = rent2RepayValid.getDaoFeeReductionConfiguration();
+        console.log("DAO treasury address:", daoTreasuryAddress);
+        console.log("DAO fees:", daoFees);
+        console.log("Sender tips:", senderTips);
+        console.log("Amount for repayment:", amountForRepayment);
+        
+        // Vérifier que le calcul est correct
+        assertNotEq(daoTreasuryAddress, address(0), "DAO treasury address should not be 0");
         assertGt(daoFees, 0, "DAO fees should be > 0");
         assertGt(senderTips, 0, "Sender tips should be > 0");
         assertLt(amountForRepayment, amount, "Amount for repayment should be < total");

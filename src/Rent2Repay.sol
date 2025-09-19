@@ -10,6 +10,9 @@ import {SafeERC20,IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeER
 import {IRMM} from "interfaces/IRMM.sol";
 
 using SafeERC20 for IERC20;
+
+
+
 /**
  * @title Rent2Repay
  * @notice A contract that manages authorization for the Rent2Repay mechanism
@@ -34,7 +37,21 @@ contract Rent2Repay is
     struct TokenConfig {
         address token;
         address supplyToken;
+        address debtToken;
         bool active;
+    }
+
+    struct InitConfig {
+        address admin;
+        address emergency;
+        address operator;
+        address rmm;
+        address wxdaiToken;
+        address wxdaiArmmToken;
+        address wxdaiDebtToken;
+        address usdcToken;
+        address usdcArmmToken;
+        address usdcDebtToken;
     }
 
     /// @custom:storage-location erc7201:rent2repay.storage
@@ -120,36 +137,22 @@ contract Rent2Repay is
 
     /**
      * @notice Initializes the contract with roles, RMM integration and initial authorized tokens
-     * @param admin Address that will have admin privileges
-     * @param emergency Address that will have emergency privileges
-     * @param operator Address that will have operator privileges
-     * @param _rmm Address of the RMM contract
-     * @param wxdaiToken Address of the WXDAI token
-     * @param wxdaiArmmToken Address of the WXDAI supply token
-     * @param usdcToken Address of the USDC token
-     * @param usdcArmmToken Address of the USDC supply token
+     * @param cfg Configuration parameters
      */
     function initialize(
-        address admin, 
-        address emergency, 
-        address operator,
-        address _rmm,
-        address wxdaiToken,
-        address wxdaiArmmToken,
-        address usdcToken,
-        address usdcArmmToken
+        InitConfig calldata cfg
     ) external initializer {
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
 
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ADMIN_ROLE, admin);
-        _grantRole(EMERGENCY_ROLE, emergency);
-        _grantRole(OPERATOR_ROLE, operator);
+        _grantRole(DEFAULT_ADMIN_ROLE, cfg.admin);
+        _grantRole(ADMIN_ROLE, cfg.admin);
+        _grantRole(EMERGENCY_ROLE, cfg.emergency);
+        _grantRole(OPERATOR_ROLE, cfg.operator);
         
         Rent2RepayStorage storage $ = _getR2rStorage();
-        $.rmm = IRMM(_rmm);
+        $.rmm = IRMM(cfg.rmm);
         
         /// @dev Initialize default fee values
         $.daoFeesBps = 50; /// @dev 0.5% default
@@ -158,8 +161,8 @@ contract Rent2Repay is
         $.defaultInterestRateMode = 2; /// @dev Default interest rate mode (2 = Variable rate)
         
         /// @dev Initialize with WXDAI and USDC as authorized token pairs
-        _authorizeTokenPair(wxdaiToken, wxdaiArmmToken);
-        _authorizeTokenPair(usdcToken, usdcArmmToken);
+        _authorizeTokenPair(cfg.wxdaiToken, cfg.wxdaiArmmToken, cfg.wxdaiDebtToken);
+        _authorizeTokenPair(cfg.usdcToken, cfg.usdcArmmToken, cfg.usdcDebtToken);
     }
 
     /**
@@ -481,11 +484,11 @@ contract Rent2Repay is
      * @param token The token address to authorize
      * @param supplyToken The supply token address associated with the token
      */
-    function authorizeTokenPair(address token, address supplyToken) 
+    function authorizeTokenPair(address token, address supplyToken, address debtToken) 
         external 
         onlyRole(ADMIN_ROLE) 
     {
-        _authorizeTokenPair(token, supplyToken);
+        _authorizeTokenPair(token, supplyToken, debtToken);
     }
 
     /**
@@ -493,11 +496,12 @@ contract Rent2Repay is
      * @param token The token address to authorize
      * @param supplyToken The supply token address associated with the token
      */
-    function _authorizeTokenPair(address token, address supplyToken) internal {
+    function _authorizeTokenPair(address token, address supplyToken, address debtToken) internal {
         Rent2RepayStorage storage $ = _getR2rStorage();
         TokenConfig memory config = TokenConfig({
             token: token,
             supplyToken: supplyToken,
+            debtToken: debtToken,
             active: true
         });
         

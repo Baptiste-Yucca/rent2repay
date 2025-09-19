@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {MockERC20} from "./MockERC20.sol";
 import {IRMM} from "interfaces/IRMM.sol";
 
 /**
@@ -16,7 +17,7 @@ contract MockRMM is IRMM {
     
     event Repaid(address token, uint256 amount, uint256 mode, address user);
     event Withdrawn(address token, uint256 amount, address to);
-    event ModeChanged(uint256 oldMode, uint256 newMode);
+
     
     /**
      * @notice Constructeur qui configure les paires token/debtToken
@@ -32,7 +33,6 @@ contract MockRMM is IRMM {
             tokenToDebtToken[tokens[i]] = debtTokens[i];
             tokenToSupplyToken[tokens[i]] = supplyTokens[i];
         }
-        
     }
 
 
@@ -84,6 +84,28 @@ contract MockRMM is IRMM {
         emit Withdrawn(asset, amount, to);
         return amount;
     }
+
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        uint16 /* referralCode */
+    ) external override {
+        require(tokenToSupplyToken[asset] != address(0), "Token not supported");
+
+        address supplyToken = tokenToSupplyToken[asset];
+
+        // 1. User envoie l'asset (ex: USDC) au MockRMM
+        require(
+            IERC20(asset).transferFrom(msg.sender, address(this), amount),
+            "Transfer asset failed"
+        );
+
+        // 2. Mint ou transférer les supplyTokens
+        // Ici on suppose que supplyToken est un ERC20 mintable mock
+        MockERC20(supplyToken).mint(onBehalfOf, amount);
+    }   
+
 
    /**
      *  @notice Récupère l'adresse du token de dette pour un token donné

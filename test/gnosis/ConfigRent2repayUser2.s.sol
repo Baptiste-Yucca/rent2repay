@@ -19,7 +19,6 @@ contract configureR2Rscript is Script {
         address usdcSupplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
         address usdcAddr = vm.envAddress("USDC_TOKEN");
         address wxdaiSupplyAddr = vm.envAddress("WXDAI_SUPPLY_TOKEN");
-        address wxdaiAddr = vm.envAddress("USDC_DEBT_TOKEN");
        
         vm.startBroadcast(user2_k);
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);

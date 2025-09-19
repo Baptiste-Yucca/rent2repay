@@ -15,25 +15,30 @@ contract DeployScript is Script {
         address rmm = vm.envAddress("RMM_ADDRESS");
         address wxdai = vm.envAddress("WXDAI_ADDRESS");
         address wxdaiSupply = vm.envAddress("WXDAI_SUPPLY_ADDRESS");
+        address wxdaiDebt = vm.envAddress("WXDAI_DEBT_ADDRESS");
         address usdc = vm.envAddress("USDC_ADDRESS");
-        address usdcSupply = vm.envAddress("USDC_SUPPLY_ADDRESS");
+        address usdcSupply = vm.envAddress("USDC_SUPPLY_ADDRESS");  
+        address usdcDebt = vm.envAddress("USDC_DEBT_ADDRESS");
         
         vm.startBroadcast(deployerPrivateKey);
         
         // Deploy Rent2Repay
         Rent2Repay rent2Repay = new Rent2Repay();
         
-        // Initialize
-        rent2Repay.initialize(
+        Rent2Repay.InitConfig memory cfg = Rent2Repay.InitConfig(
             admin,
             emergency,
             operator,
             rmm,
             wxdai,
             wxdaiSupply,
+            wxdaiDebt,
             usdc,
-            usdcSupply
+            usdcSupply,
+            usdcDebt
         );
+        // Initialize
+        rent2Repay.initialize(cfg);
         
         vm.stopBroadcast();
         

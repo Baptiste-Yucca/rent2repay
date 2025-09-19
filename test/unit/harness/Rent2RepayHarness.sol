@@ -130,8 +130,8 @@ contract Rent2RepayHarness is Rent2Repay {
      * @param token The token address to authorize
      * @param supplyToken The supply token address associated with the token
      */
-    function exposed_authorizeTokenPair(address token, address supplyToken) external {
-        _authorizeTokenPair(token, supplyToken);
+    function exposed_authorizeTokenPair(address token, address supplyToken, address debtToken) external {
+        _authorizeTokenPair(token, supplyToken, debtToken);
     }
 
     /**
