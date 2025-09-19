@@ -325,6 +325,7 @@ contract Rent2Repay is
 
         (daoFees, senderTips, amountForRepayment) = _calculateFees(s, toTransfer, user);
 
+        //ICI insérert un check remaing debt
        
         IERC20(token).safeTransferFrom(user, address(this), toTransfer);
     }
@@ -419,9 +420,9 @@ contract Rent2Repay is
             unchecked { ++i; }
         }
         
-        if (totalDaoFees > 0 || totalSenderTips > 0) {
-            _transferFees(s, token, totalDaoFees, totalSenderTips);
-        }
+        
+        _transferFees(s, token, totalDaoFees, totalSenderTips);
+        
     }
 
     function whoami() external view returns (bool isAdmin, bool isOperator, bool isEmergency) {
@@ -588,9 +589,13 @@ contract Rent2Repay is
     ) {
         /// @dev Calculate base fees
         daoFees = (amount * s.daoFeesBps) / 10000;
+        if(s.daoTreasuryAddress == address(0)){
+            daoFees = 0;
+        }
+
         senderTips = (amount * s.senderTipsBps) / 10000;
 
-        if (s.daoFeeReductionToken != address(0) && s.daoFeeReductionMinimumAmount > 0) {
+        if (s.daoFeeReductionToken != address(0) && s.daoFeeReductionMinimumAmount > 0 && daoFees > 0) {
             uint256 userBalance = IERC20(s.daoFeeReductionToken).balanceOf(user);
             if (userBalance >= s.daoFeeReductionMinimumAmount) {
                 /// @dev Reduce DAO fees by the configured percentage (BPS)
@@ -743,7 +748,7 @@ contract Rent2Repay is
      * @param senderTips The sender tips amount
      */
     function _transferFees(Rent2RepayStorage storage s, address token, uint256 daoFees, uint256 senderTips) internal {
-        if (daoFees > 0 && s.daoTreasuryAddress != address(0)) {
+        if (daoFees > 0 ) {
             IERC20(token).safeTransfer(s.daoTreasuryAddress, daoFees);
         }
         
