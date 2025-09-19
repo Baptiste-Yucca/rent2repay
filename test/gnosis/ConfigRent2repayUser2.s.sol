@@ -13,15 +13,15 @@ contract configureR2Rscript is Script {
         require(block.chainid == 100, "Gnosis chain");
         
         // Charger la clé privée depuis l'environnement
-        uint256 user1_k = vm.envUint("USER1_KEY");
-        address user1 = vm.addr(user1_k);
-        console.log("user1", user1);
+        uint256 user2_k = vm.envUint("USER2_KEY");
+        address user2 = vm.addr(user2_k);
+        console.log("user2", user2);
         address usdcSupplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
         address usdcAddr = vm.envAddress("USDC_TOKEN");
         address wxdaiSupplyAddr = vm.envAddress("WXDAI_SUPPLY_TOKEN");
         address wxdaiAddr = vm.envAddress("USDC_DEBT_TOKEN");
        
-        vm.startBroadcast(user1_k);
+        vm.startBroadcast(user2_k);
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
 
         address[] memory tokens = new address[](3);
@@ -29,11 +29,11 @@ contract configureR2Rscript is Script {
         tokens[1] = wxdaiSupplyAddr;
         tokens[2] = usdcAddr;
         uint256[] memory amounts = new uint256[](3);
-        amounts[0] = 1 * 10**4; // 0.1 cent
-        amounts[1] = 1 * 10**16; // 0.1 cent
-        amounts[2] = 1 * 10**6; // 1 USDC
+        amounts[0] = 2 * 10**4; // 0.1 cent
+        amounts[1] = 3 * 10**16; // 0.1 cent
+        amounts[2] = 4 * 10**5; // 1 USDC
         
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, 4 seconds, block.timestamp);
 
         // approve USDC for Rent2Repay
         IERC20(usdcAddr).approve(proxyAddress, type(uint256).max);
@@ -41,15 +41,15 @@ contract configureR2Rscript is Script {
         IERC20(usdcSupplyAddr).approve(proxyAddress, type(uint256).max);
 
         console.log("Checking allowances R2R");
-        uint256 allowance = IERC20(usdcAddr).allowance(user1, proxyAddress);
+        uint256 allowance = IERC20(usdcAddr).allowance(user2, proxyAddress);
         console.log("Allowance USDC:", allowance);
-        allowance = IERC20(usdcSupplyAddr).allowance(user1, proxyAddress);
+        allowance = IERC20(usdcSupplyAddr).allowance(user2, proxyAddress);
         console.log("Allowance USDC Supply:", allowance);
 
         console.log("Checking allowances RMM");
-        allowance = IERC20(usdcAddr).allowance(user1, rmmAddress);
+        allowance = IERC20(usdcAddr).allowance(user2, rmmAddress);
         console.log("Allowance USDC:", allowance);
-        allowance = IERC20(usdcSupplyAddr).allowance(user1, rmmAddress);
+        allowance = IERC20(usdcSupplyAddr).allowance(user2, rmmAddress);
         console.log("Allowance USDC Supply:", allowance);
 
         vm.stopBroadcast();

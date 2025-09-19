@@ -16,6 +16,7 @@ contract callR2Rscript is Script {
         address user1 = vm.addr(user1_k);
         uint256 user2_k = vm.envUint("USER2_KEY");
         address user2 = vm.addr(user2_k);
+    
         console.log("This BOT", user2);
         console.log("will call rent2repay for", user1);
 
@@ -28,7 +29,7 @@ contract callR2Rscript is Script {
         // Créer une instance du contrat via le proxy
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
 
-
+    
         rent2Repay.rent2repay(user1, usdcAddr);
         
         vm.stopBroadcast();

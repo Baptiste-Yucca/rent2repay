@@ -13,7 +13,7 @@ contract checkBalancesScript is Script {
         require(block.chainid == 100, "Gnosis chain");
         
         // Charger la clé privée depuis l'environnement
-        uint256 user1_k = vm.envUint("USER1_KEY");
+        uint256 user1_k = vm.envUint("USER2_KEY");
         address user1 = vm.addr(user1_k);
 
         address usdcSupplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
@@ -54,18 +54,18 @@ contract checkBalancesScript is Script {
         console.log("USR 1 Checking allowances RMM");
         allowance = IERC20(usdcAddr).allowance(user1, rmmAddress);
         console.log("Allowance USDC:", allowance);
-        /*if(allowance == 0) {
+        if(allowance == 0) {
                 IERC20(usdcAddr).approve(rmmAddress, type(uint256).max);
                 allowance = IERC20(usdcAddr).allowance(user1, rmmAddress);
                 console.log("New Allowance USDC:", allowance);
-        }*/
+        }
         allowance = IERC20(usdcSupplyAddr).allowance(user1, rmmAddress);
         console.log("Allowance USDC Supply:", allowance);
-        /*if(allowance == 0) {
+        if(allowance == 0) {
                 IERC20(usdcAddr).approve(rmmAddress, type(uint256).max);
                 allowance = IERC20(usdcAddr).allowance(user1, rmmAddress);
                 console.log("Allowance USDC:", allowance);
-        }*/
+        }
         console.log("R2R Checking allowances RMM");
         allowance = IERC20(usdcAddr).allowance(proxyAddress, rmmAddress);
         console.log("Allowance USDC:", allowance);
