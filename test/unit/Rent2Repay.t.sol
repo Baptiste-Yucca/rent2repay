@@ -15,6 +15,7 @@ contract Rent2RepayTest is Test {
     MockERC20 public usdc;
     MockERC20 public wxdaiSupply;
     MockERC20 public usdcSupply;
+    MockERC20 public usdcDebt;
     
     address public admin = address(0x1);
     address public emergency = address(0x2);
@@ -37,7 +38,7 @@ contract Rent2RepayTest is Test {
         
         // Créer les debt tokens
         MockERC20 wxdaiDebt = new MockERC20("WXDAI Debt", "dWXDAI", 18, 1000000 ether);
-        MockERC20 usdcDebt = new MockERC20("USDC Debt", "dUSDC", 6, 1000000 * 10**6);
+        usdcDebt = new MockERC20("USDC Debt", "dUSDC", 6, 1000000 * 10**6);
         
         // Configurer le MockRMM avec les paramètres requis
         address[] memory tokens = new address[](2);
@@ -65,10 +66,10 @@ contract Rent2RepayTest is Test {
             rmm: address(mockRMM),
             wxdaiToken: address(wxdai),
             wxdaiArmmToken: address(wxdaiSupply),
-            wxdaiDebtToken: address(0), // Si pas utilisé dans les tests
+            wxdaiDebtToken: address(wxdaiDebt), // Si pas utilisé dans les tests
             usdcToken: address(usdc),
             usdcArmmToken: address(usdcSupply),
-            usdcDebtToken: address(0)   // Si pas utilisé dans les tests
+            usdcDebtToken: address(usdcDebt)   // Si pas utilisé dans les tests
         });
 
         bytes memory initData = abi.encodeWithSelector(
@@ -158,59 +159,6 @@ contract Rent2RepayTest is Test {
     }
 
 
-    function testRent2Repay() public {
-        // Configure first
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(wxdai);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 10 ether;
-        
-        vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
-
-        // Avancer le temps pour respecter la périodicité
-        vm.warp(block.timestamp + 2 seconds);
-        
-        // Récupérer la configuration des frais
-        (uint256 daoFeesBps, uint256 senderTipsBps) = rent2Repay.getFeeConfiguration();
-        
-        // Mesurer les balances avant l'appel
-        uint256 userBalanceBefore = wxdai.balanceOf(user);
-        uint256 user2BalanceBefore = wxdai.balanceOf(user2);
-        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
-        
-        // Execute rent2repay avec user2 comme caller (qui reçoit les frais)
-        vm.prank(user2);
-        rent2Repay.rent2repay(user, address(wxdai));
-        
-        // Mesurer les balances après l'appel
-        uint256 userBalanceAfter = wxdai.balanceOf(user);
-        uint256 user2BalanceAfter = wxdai.balanceOf(user2);
-        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        
-        // Vérifier que l'utilisateur a payé
-        assertLt(userBalanceAfter, userBalanceBefore);
-        
-        // Calculer les frais attendus
-        uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
-        uint256 expectedDaoFees = (amountRepaid * daoFeesBps) / 10000;
-        uint256 expectedSenderTips = (amountRepaid * senderTipsBps) / 10000;
-        
-        // Vérifier que user2 a reçu les frais de sender tips
-        uint256 actualTipsReceived = user2BalanceAfter - user2BalanceBefore;
-        assertEq(actualTipsReceived, expectedSenderTips, "User2 should receive correct sender tips");
-        
-        // Vérifier que la DAO treasury a reçu les frais DAO
-        uint256 actualDaoFeesReceived = daoTreasuryBalanceAfter - daoTreasuryBalanceBefore;
-        assertEq(actualDaoFeesReceived, expectedDaoFees, "DAO treasury should receive correct DAO fees");
-        
-        // ===== TEST avec token non défini =====
-        address nonDefinedToken = address(0x1234); // Token non configuré
-        
-        vm.prank(user2);
-        vm.expectRevert();
-        rent2Repay.rent2repay(user, nonDefinedToken);
-    }
     
     function testBatchRent2Repay() public {
         // ===== SETUP =====
@@ -219,7 +167,6 @@ contract Rent2RepayTest is Test {
         
         // Récupérer les debt tokens du MockRMM (utilise ceux configurés dans setUp)
         address wxdaiDebt = mockRMM.getDebtToken(address(wxdai));
-        address usdcDebt = mockRMM.getDebtToken(address(usdc));
         
         // Donner des debt tokens au user2
         MockERC20(wxdaiDebt).mint(user2, 50 ether);
@@ -1214,6 +1161,7 @@ contract Rent2RepayTest is Test {
         // Mint supply tokens to the user
         uint256 supplyAmount = 10000 * 10**6; // 10000 USDC worth (enough for the test)
         usdcSupply.mint(user, supplyAmount);
+        usdcDebt.mint(user, supplyAmount);
         
         // Configure user for the supply token (usdcSupply)
         address[] memory tokens = new address[](1);

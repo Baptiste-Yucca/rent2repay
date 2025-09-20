@@ -23,6 +23,19 @@ contract Rent2RepayHarness is Rent2Repay {
         }
     }
 
+    function exposed_validTokenAddress(address token) 
+        external 
+        validTokenAddress(token) 
+    {
+        // rien, on veut juste tester le modifier
+    }
+
+    function exposed_onlyAuthorizedToken(address token) 
+        external 
+        onlyAuthorizedToken(token) 
+    {
+        // rien, on veut juste tester le modifier
+    }
 
     /**
      * @notice Exposes the internal _transferFees function for testing

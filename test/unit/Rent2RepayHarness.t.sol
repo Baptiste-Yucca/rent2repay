@@ -210,6 +210,17 @@ contract Rent2RepayHarnessTest is Test {
         assertEq(rent2Repay.periodicity(user, address(usdc)), 0, "USDC periodicity should be 0");
     }
 
+    function testExposedValidTokenAddress() public {
+        vm.prank(user);
+        rent2Repay.exposed_validTokenAddress(address(0x1));
+        vm.expectRevert();
+        rent2Repay.exposed_validTokenAddress(address(0));
+
+        rent2Repay.exposed_onlyAuthorizedToken(address(usdc));
+        vm.expectRevert();
+        rent2Repay.exposed_onlyAuthorizedToken(address(0));
+    }
+
     function testExposedAuthorizeTokenPair() public {
         // Créer un nouveau token
         MockERC20 newToken = new MockERC20("New Token", "NEW", 18, 1000000 ether);

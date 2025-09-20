@@ -291,7 +291,6 @@ contract Rent2Repay is
         returns (uint256 adjustedDaoFees, uint256 senderTips, uint256 actualAmountRepaid) 
     {
         require(s.lastRepayTimestamps[user] != 0, "User not authorized");
-        require(s.allowedMaxAmounts[user][token] > 0, "User not configured for token");
         require(s.periodicity[user][token] > 0, "Periodicity not set");
         require(_isNewPeriod(user, token), "Wait next period");
         
@@ -324,12 +323,15 @@ contract Rent2Repay is
     {
         uint256 amount = s.allowedMaxAmounts[user][token];
         uint256 balance = IERC20(token).balanceOf(user);
+        uint256 remainingDebt = IERC20(s.tokenConfig[token].debtToken).balanceOf(user);
+
         uint256 toTransfer = balance < amount ? balance : amount;
+        toTransfer = remainingDebt < toTransfer ? remainingDebt : toTransfer;
+
+        require(toTransfer > 0, "No amount to transfer");
 
         (daoFees, senderTips, amountForRepayment) = _calculateFees(s, toTransfer, user);
 
-        //ICI insérert un check remaing debt
-       
         IERC20(token).safeTransferFrom(user, address(this), toTransfer);
     }
 

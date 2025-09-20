@@ -65,10 +65,10 @@ contract Rent2RepayCoverageTest is Test {
             rmm: address(mockRMM),
             wxdaiToken: address(wxdai),
             wxdaiArmmToken: address(wxdaiSupply),
-            wxdaiDebtToken: address(0), // Si pas utilisé dans les tests
+            wxdaiDebtToken: address(wxdaiDebt), // Si pas utilisé dans les tests
             usdcToken: address(usdc),
             usdcArmmToken: address(usdcSupply),
-            usdcDebtToken: address(0)   // Si pas utilisé dans les tests
+            usdcDebtToken: address(usdcDebt)   // Si pas utilisé dans les tests
         });
 
         bytes memory initData = abi.encodeWithSelector(
@@ -265,17 +265,12 @@ contract Rent2RepayCoverageTest is Test {
         
         // Tester avec un token pour lequel user n'est pas configuré (usdc)
         vm.prank(user2);
-        vm.expectRevert("User not configured for token");
+        vm.expectRevert();
         rent2Repay.rent2repay(user, address(usdc));
     }
     
-    function testRent2RepayWithPeriodicityNotSet() public {
-        // Test du require: $.periodicity[user][token] > 0
-        // Ce cas est difficile à reproduire car configureRent2Repay définit toujours periodicity > 0
-        // Mais on peut tester en configurant user puis en supprimant manuellement la periodicity
-        // Pour l'instant, on va simuler en utilisant un user non configuré pour ce token spécifique
-        
-        // Configurer user pour wxdai
+    function testRent2RepayWithTokenNotSet() public {
+
         address[] memory tokens = new address[](1);
         tokens[0] = address(wxdai);
         uint256[] memory amounts = new uint256[](1);
@@ -287,11 +282,9 @@ contract Rent2RepayCoverageTest is Test {
         // Avancer le temps
         vm.warp(block.timestamp + 2 seconds);
         
-        // Tester avec un token non configuré (usdc) - cela devrait échouer sur "User not configured for token"
-        // plutôt que "Periodicity not set", mais c'est le plus proche qu'on peut faire
         vm.prank(user2);
-        vm.expectRevert("User not configured for token");
-        rent2Repay.rent2repay(user, address(usdc));
+        vm.expectRevert();
+        rent2Repay.rent2repay(user, address(usdc)); //not set configured
     }
     
     function testRent2RepayBeforePeriodEnd() public {
@@ -347,7 +340,7 @@ contract Rent2RepayCoverageTest is Test {
         users[0] = user;
         
         vm.prank(operator);
-        vm.expectRevert("User not configured for token");
+        vm.expectRevert();
         rent2Repay.batchRent2Repay(users, address(usdc));
     }
     
