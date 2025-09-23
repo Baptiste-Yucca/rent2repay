@@ -19,6 +19,13 @@ contract DeployScript is Script {
         address usdc = vm.envAddress("USDC_ADDRESS");
         address usdcSupply = vm.envAddress("USDC_SUPPLY_ADDRESS");  
         address usdcDebt = vm.envAddress("USDC_DEBT_ADDRESS");
+
+        console.log("wxdai", wxdai);
+        console.log("wxdaiSupply", wxdaiSupply);
+        console.log("wxdaiDebt", wxdaiDebt);
+        console.log("usdc", usdc);
+        console.log("usdcSupply", usdcSupply);
+        console.log("usdcDebt", usdcDebt);
         
         vm.startBroadcast(deployerPrivateKey);
         

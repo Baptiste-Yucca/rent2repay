@@ -29,8 +29,8 @@ contract configureR2Rscript is Script {
         tokens[1] = wxdaiSupplyAddr;
         tokens[2] = usdcAddr;
         uint256[] memory amounts = new uint256[](3);
-        amounts[0] = 1 * 10**4; // 0.1 cent
-        amounts[1] = 1 * 10**16; // 0.1 cent
+        amounts[0] = 6 * 10**3; // 0.1 cent
+        amounts[1] = 6 * 10**3; // 0.1 cent
         amounts[2] = 1 * 10**6; // 1 USDC
         
         rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);

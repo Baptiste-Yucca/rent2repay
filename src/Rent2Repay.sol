@@ -755,11 +755,19 @@ contract Rent2Repay is
      */
     function _transferFees(Rent2RepayStorage storage s, address token, uint256 daoFees, uint256 senderTips) internal {
         if (daoFees > 0 ) {
-            IERC20(token).safeTransfer(s.daoTreasuryAddress, daoFees);
+            if (s.tokenConfig[token].supplyToken == token) {
+                IERC20(token).safeTransfer(s.daoTreasuryAddress, daoFees);
+            }else{
+                s.rmm.supply(token, daoFees, s.daoTreasuryAddress, 0);
+            }
         }
         
         if (senderTips > 0) {
-            IERC20(token).safeTransfer(msg.sender, senderTips);
+            if (s.tokenConfig[token].supplyToken == token) {
+                IERC20(token).safeTransfer(msg.sender, senderTips);
+            }else{
+                s.rmm.supply(token, senderTips, msg.sender, 0);
+            }
         }
     }
 

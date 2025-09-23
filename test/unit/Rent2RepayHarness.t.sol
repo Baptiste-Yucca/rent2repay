@@ -62,10 +62,10 @@ contract Rent2RepayHarnessTest is Test {
             rmm: address(mockRMM),
             wxdaiToken: address(wxdai),
             wxdaiArmmToken: address(wxdaiSupply),
-            wxdaiDebtToken: address(0), // Si pas utilisé dans les tests
+            wxdaiDebtToken: address(wxdaiDebt), // Si pas utilisé dans les tests
             usdcToken: address(usdc),
             usdcArmmToken: address(usdcSupply),
-            usdcDebtToken: address(0)   // Si pas utilisé dans les tests
+            usdcDebtToken: address(usdcDebt)   // Si pas utilisé dans les tests
         });
 
         bytes memory initData = abi.encodeWithSelector(
@@ -174,8 +174,8 @@ contract Rent2RepayHarnessTest is Test {
         vm.prank(user2);
         rent2Repay.exposed_transferFees(address(wxdai), daoFees, senderTips);
         
-        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        uint256 user2BalanceAfter = wxdai.balanceOf(user2);
+        uint256 daoTreasuryBalanceAfter = wxdaiSupply.balanceOf(daoTreasury);
+        uint256 user2BalanceAfter = wxdaiSupply.balanceOf(user2);
         
         // Vérifier que les frais ont été transférés
         assertEq(daoTreasuryBalanceAfter - daoTreasuryBalanceBefore, daoFees, "DAO treasury should receive DAO fees");
@@ -250,8 +250,8 @@ contract Rent2RepayHarnessTest is Test {
         vm.prank(user2);
         rent2Repay.exposed_transferFees(address(wxdai), 10 ether, 5 ether);
         
-        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        uint256 user2BalanceAfter = wxdai.balanceOf(user2);
+        uint256 daoTreasuryBalanceAfter = wxdaiSupply.balanceOf(daoTreasury);
+        uint256 user2BalanceAfter = wxdaiSupply.balanceOf(user2);
         
         assertEq(daoTreasuryBalanceAfter - daoTreasuryBalanceBefore, 10 ether, "DAO treasury should receive DAO fees");
         assertEq(user2BalanceAfter - user2BalanceBefore, 5 ether, "User2 should receive sender tips");
@@ -261,13 +261,13 @@ contract Rent2RepayHarnessTest is Test {
         console.log("\n=== TEST 2: daoFees = 0 (branche false) ===");
         
         daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
-        user2BalanceBefore = wxdai.balanceOf(user2);
+        user2BalanceBefore = wxdaiSupply.balanceOf(user2);
         
         vm.prank(user2);
         rent2Repay.exposed_transferFees(address(wxdai), 0, 3 ether);
         
         daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        user2BalanceAfter = wxdai.balanceOf(user2);
+        user2BalanceAfter = wxdaiSupply.balanceOf(user2);
         
         // DAO treasury ne devrait pas recevoir de tokens (daoFees = 0)
         assertEq(daoTreasuryBalanceAfter, daoTreasuryBalanceBefore, "DAO treasury should not receive tokens when daoFees = 0");

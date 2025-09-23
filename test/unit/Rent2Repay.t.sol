@@ -207,8 +207,8 @@ contract Rent2RepayTest is Test {
         uint256[] memory balancesBefore = new uint256[](2);
         balancesBefore[0] = wxdai.balanceOf(user);
         balancesBefore[1] = wxdai.balanceOf(user2);
-        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
-        uint256 operatorBalanceBefore = wxdai.balanceOf(operator);
+        uint256 daoTreasuryBalanceBefore = wxdaiSupply.balanceOf(daoTreasury);
+        uint256 operatorBalanceBefore = wxdaiSupply.balanceOf(operator);
         
         // ===== EXECUTION DU BATCH =====
         address[] memory users = new address[](2);
@@ -222,8 +222,8 @@ contract Rent2RepayTest is Test {
         uint256[] memory balancesAfter = new uint256[](2);
         balancesAfter[0] = wxdai.balanceOf(user);
         balancesAfter[1] = wxdai.balanceOf(user2);
-        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
-        uint256 operatorBalanceAfter = wxdai.balanceOf(operator);
+        uint256 daoTreasuryBalanceAfter = wxdaiSupply.balanceOf(daoTreasury);
+        uint256 operatorBalanceAfter = wxdaiSupply.balanceOf(operator);
         
         // ===== VÉRIFICATIONS =====
         // Vérifier que les deux utilisateurs sont toujours autorisés
@@ -1062,13 +1062,13 @@ contract Rent2RepayTest is Test {
         // ===== ÉTAPE 1: USER SANS TOKEN DE GOUVERNANCE =====
         console.log("\n=== STEP 1: User without governance token ===");
         
-        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
+        uint256 daoTreasuryBalanceBefore = wxdaiSupply.balanceOf(daoTreasury);
         uint256 userBalanceBefore = wxdai.balanceOf(user);
         
         vm.prank(user2);
         rent2Repay.rent2repay(user, address(wxdai));
         
-        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
+        uint256 daoTreasuryBalanceAfter = wxdaiSupply.balanceOf(daoTreasury);
         uint256 userBalanceAfter = wxdai.balanceOf(user);
         
         uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
@@ -1094,13 +1094,13 @@ contract Rent2RepayTest is Test {
         
         (uint256 daoFeesBps, ) = rent2Repay.getFeeConfiguration();
         
-        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
+        uint256 daoTreasuryBalanceBefore = wxdaiSupply.balanceOf(daoTreasury);
         uint256 userBalanceBefore = wxdai.balanceOf(user);
         
         vm.prank(user2);
         rent2Repay.rent2repay(user, address(wxdai));
         
-        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
+        uint256 daoTreasuryBalanceAfter = wxdaiSupply.balanceOf(daoTreasury);
         uint256 userBalanceAfter = wxdai.balanceOf(user);
         
         uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
@@ -1128,13 +1128,13 @@ contract Rent2RepayTest is Test {
         (uint256 daoFeesBps, ) = rent2Repay.getFeeConfiguration();
         uint256 reductionBps = rent2Repay.daoFeeReductionBps();
         
-        uint256 daoTreasuryBalanceBefore = wxdai.balanceOf(daoTreasury);
+        uint256 daoTreasuryBalanceBefore = wxdaiSupply.balanceOf(daoTreasury);
         uint256 userBalanceBefore = wxdai.balanceOf(user);
         
         vm.prank(user2);
         rent2Repay.rent2repay(user, address(wxdai));
         
-        uint256 daoTreasuryBalanceAfter = wxdai.balanceOf(daoTreasury);
+        uint256 daoTreasuryBalanceAfter = wxdaiSupply.balanceOf(daoTreasury);
         uint256 userBalanceAfter = wxdai.balanceOf(user);
         
         uint256 amountRepaid = userBalanceBefore - userBalanceAfter;
