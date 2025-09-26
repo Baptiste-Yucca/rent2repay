@@ -115,11 +115,15 @@ contract Rent2Repay is
 
     /// @notice Emitted when a user revokes all their Rent2Repay authorizations
     /// @param user The user address that revoked all authorizations
-    event RevokedR2R (address indexed user);
+    event UnsetR2R (address indexed user);
 
-    /// @notice Emitted when a user configure all their Rent2Repay authorizations
-    /// @param user The user address that revoked all authorizations
-    event ConfiguredR2R (address indexed user);
+    event SetR2R(
+        address indexed user,
+        address indexed token,
+        uint256 amount,
+        uint256 period,
+        uint256 timestamp
+    );
 
 
     /// @notice Custom errors for better gas efficiency
@@ -214,7 +218,9 @@ contract Rent2Repay is
             $.periodicity[msg.sender][$.tokenList[i]] = 0;
             unchecked { ++i; }
         }
-        
+        /// @dev Initialize/activate user with timestamp (0 = inactive, !=0 = active)
+        $.lastRepayTimestamps[msg.sender] = timestamp > 0 ? timestamp : 1;
+
         /// @dev Valorize values
         for (uint256 i = 0; i < len;) {
             require(amounts[i] != type(uint256).max, "Inv Amount"); /// @dev to avoid max repay 
@@ -222,13 +228,10 @@ contract Rent2Repay is
                 "Invalid token or amount");
             $.allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
             $.periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
+            emit SetR2R(msg.sender, tokens[i], amounts[i], period, $.lastRepayTimestamps[msg.sender]);
             unchecked { ++i; }
         }
-        
-        /// @dev Initialize/activate user with timestamp (0 = inactive, !=0 = active)
-        $.lastRepayTimestamps[msg.sender] = timestamp > 0 ? timestamp : 1;
-        
-        emit ConfiguredR2R(msg.sender);
+
     }
 
     /**
@@ -250,7 +253,6 @@ contract Rent2Repay is
         userIsAuthorized(user) 
     {
         _removeUserAllTokens(user);
-        emit RevokedR2R(user);
     }
 
     /**
@@ -565,8 +567,7 @@ contract Rent2Repay is
             $.periodicity[user][$.tokenList[i]] = 0;
             unchecked { ++i; }
         }
-        
-        emit RevokedR2R(user);
+        emit UnsetR2R(user);
     }
 
     /**
