@@ -21,9 +21,13 @@ contract sendTokenScript is Script {
 
         address usdcAddr = vm.envAddress("USDC_TOKEN");
         address usdcSupplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
-
-        vm.startBroadcast(deployerPrivateKey);
         
+        vm.startBroadcast(user1_k);
+        IERC20(usdcAddr).transfer(proxyAddress, 100);
+        //IERC20(usdcSupplyAddr).transfer(user1, 100);
+        vm.stopBroadcast();
+
+        vm.startBroadcast(deployerPrivateKey);        
         // Créer une instance du contrat via le proxy
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
 

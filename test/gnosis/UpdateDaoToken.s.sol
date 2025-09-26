@@ -28,10 +28,10 @@ contract UpdateDaoTokenScript is Script {
         console.log("DAO Fee Reduction BPS:", daoFeeBps);
 
         uint256 senderTipsBps = rent2Repay.senderTipsBps();
-        console.log("DAO Fee Reduction BPS:", senderTipsBps);
+        console.log("Tips BPS:", senderTipsBps);
         rent2Repay.updateSenderTips(2);
         senderTipsBps = rent2Repay.senderTipsBps();
-        console.log("DAO Fee Reduction BPS:", senderTipsBps);
+        console.log("Tips BPS:", senderTipsBps);
 
         address daoFeeReductionToken = rent2Repay.daoFeeReductionToken();
         console.log("DAO Fee Reduction Token:", daoFeeReductionToken);
