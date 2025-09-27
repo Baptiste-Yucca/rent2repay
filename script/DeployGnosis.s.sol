@@ -23,20 +23,20 @@ contract DeployGnosisScript is Script {
     function run() external {
         // Charger la clé privée depuis l'environnement
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        
+
         console.log("=== DEPLOYING RENT2REPAY ON GNOSIS ===");
         console.log("Deployer address:", vm.addr(deployerPrivateKey));
         console.log("Chain ID:", block.chainid);
-        
+
         // Vérifier que nous sommes sur Gnosis
         require(block.chainid == 100, "Must be on Gnosis chain");
-        
+
         vm.startBroadcast(deployerPrivateKey);
-        
+
         // 1. Deploy l'implémentation
         Rent2Repay implementation = new Rent2Repay();
         console.log("Rent2Repay implementation deployed at:", address(implementation));
-        
+
         // 2. Préparer les données d'initialisation
         Rent2Repay.InitConfig memory cfg = Rent2Repay.InitConfig({
             admin: ADMIN_ADDRESS,
@@ -48,52 +48,49 @@ contract DeployGnosisScript is Script {
             wxdaiDebtToken: WXDAI_DEBT_TOKEN, // Si pas utilisé dans les tests
             usdcToken: USDC_TOKEN,
             usdcArmmToken: USDC_SUPPLY_TOKEN,
-            usdcDebtToken: USDC_DEBT_TOKEN   // Si pas utilisé dans les tests
+            usdcDebtToken: USDC_DEBT_TOKEN // Si pas utilisé dans les tests
         });
 
-        bytes memory initData = abi.encodeWithSelector(
-            Rent2Repay.initialize.selector,
-            cfg
-        );
-        
+        bytes memory initData = abi.encodeWithSelector(Rent2Repay.initialize.selector, cfg);
+
         // 3. Deploy le proxy avec l'implémentation
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
         Rent2Repay rent2Repay = Rent2Repay(address(proxy));
-        
+
         console.log("Rent2Repay proxy deployed at:", address(rent2Repay));
-        
+
         // 4. Configuration post-déploiement
         rent2Repay.updateDaoTreasuryAddress(DAO_TREASURY);
         console.log("DAO Treasury address set to:", DAO_TREASURY);
-        
+
         rent2Repay.updateDaoFeeReductionToken(DAO_GOVERNANCE_TOKEN);
         console.log("DAO Governance token set to:", DAO_GOVERNANCE_TOKEN);
-        
+
         rent2Repay.updateDaoFeeReductionMinimumAmount(1);
         console.log("DAO Fee reduction minimum amount set to: 100 ether");
-        
+
         rent2Repay.updateDaoFeeReductionPercentage(5000); // 50% de réduction
         console.log("DAO Fee reduction percentage set to: 50%");
-        
+
         // 5. Vérifications finales
         console.log("\n=== DEPLOYMENT VERIFICATION ===");
         console.log("Admin role:", rent2Repay.hasRole(rent2Repay.ADMIN_ROLE(), ADMIN_ADDRESS));
         console.log("Emergency role:", rent2Repay.hasRole(rent2Repay.EMERGENCY_ROLE(), EMERGENCY_ADDRESS));
         console.log("Operator role:", rent2Repay.hasRole(rent2Repay.OPERATOR_ROLE(), OPERATOR_ADDRESS));
         console.log("RMM address:", address(rent2Repay.rmm()));
-        
+
         (uint256 daoFees, uint256 senderTips) = rent2Repay.getFeeConfiguration();
         console.log("DAO fees (BPS):", daoFees);
         console.log("Sender tips (BPS):", senderTips);
-        
+
         address[] memory activeTokens = rent2Repay.getActiveTokens();
         console.log("Number of active tokens:", activeTokens.length);
-        for (uint i = 0; i < activeTokens.length; i++) {
+        for (uint256 i = 0; i < activeTokens.length; i++) {
             console.log("Active token", i, ":", activeTokens[i]);
         }
-        
+
         vm.stopBroadcast();
-        
+
         console.log("\n=== DEPLOYMENT COMPLETED SUCCESSFULLY ===");
         console.log("Contract address:", address(rent2Repay));
         console.log("Implementation address:", address(implementation));

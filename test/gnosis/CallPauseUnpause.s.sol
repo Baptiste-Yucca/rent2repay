@@ -7,59 +7,39 @@ contract CallPauseScript is Script {
     function run() external {
         // Charger les adresses depuis l'environnement
         address proxyAddress = vm.envAddress("R2R_PROXY_ADDR");
-        
+
         // Vérifier que nous sommes sur Gnosis
         require(block.chainid == 100, "Gnosis chain");
-       
+
         uint256 adminKey = vm.envUint("PRIVATE_KEY");
         address admin = vm.addr(adminKey);
-    
-      
+
         // Si ADMIN_KEY n'existe pas, essayer OPERATOR_KEY
         uint256 emergencyKey = vm.envUint("EMERGENCY_KEY");
         address emergency = vm.addr(emergencyKey);
 
-
-        
-        
-        vm.startBroadcast(adminKey);
-        
-        // Créer une instance du contrat via le proxy
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
-        (bool isAdmin, bool isOperator, bool isEmergency) = rent2Repay.whoami();
-        console.log("Admin:", isAdmin);
-        console.log("Operator:", isOperator);
-        console.log("Emergency:", isEmergency);
-        vm.stopBroadcast();
+
         // Vérifier l'état actuel du contrat
         bool isPaused = rent2Repay.paused();
         console.log("Currently paused ? 0:f 1:t", isPaused);
-        
+
         if (!isPaused) {
             console.log("Contract is not paused, => pause()");
             console.log("Caller address:", emergency);
-            
-            vm.startBroadcast(emergencyKey);
-            ( isAdmin,  isOperator,  isEmergency) = rent2Repay.whoami();
-            console.log("Admin:", isAdmin);
-            console.log("Operator:", isOperator);
-            console.log("Emergency:", isEmergency);
-            rent2Repay.pause();
 
+            vm.startBroadcast(emergencyKey);
+            rent2Repay.pause();
         } else {
             // Mettre en pause le contrat
             console.log("Contract is yet paused, => unpause()");
             console.log("Caller address:", admin);
-            
+
             vm.startBroadcast(adminKey);
-            ( isAdmin,  isOperator,  isEmergency) = rent2Repay.whoami();
-            console.log("Admin:", isAdmin);
-            console.log("Operator:", isOperator);
-            console.log("Emergency:", isEmergency);
             rent2Repay.unpause();
             console.log("Contract paused successfully");
         }
-        
+
         vm.stopBroadcast();
     }
 }

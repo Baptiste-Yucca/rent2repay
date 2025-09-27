@@ -12,19 +12,18 @@ contract callR2Rscript is Script {
 
         // Vérifier que nous sommes sur Gnosis
         require(block.chainid == 100, "Gnosis chain");
-        
+
         // Charger la clé privée depuis l'environnement
-        uint256 user1_k = vm.envUint("USER1_KEY");
-        address user1 = vm.addr(user1_k);
-        uint256 user2_k = vm.envUint("USER2_KEY");
-        address user2 = vm.addr(user2_k);
+        uint256 user1Key = vm.envUint("USER1_KEY");
+        address user1 = vm.addr(user1Key);
+        uint256 user2Key = vm.envUint("USER2_KEY");
+        address user2 = vm.addr(user2Key);
         console.log("User1", user2);
         console.log("User2", user1);
 
         address usdcAddr = vm.envAddress("USDC_TOKEN");
         address usdcSupplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
         address usdcDebtAddr = vm.envAddress("USDC_DEBT_TOKEN");
-
 
         uint256 op_k = vm.envUint("OPERATOR_KEY");
         address op = vm.addr(op_k);
@@ -52,17 +51,14 @@ contract callR2Rscript is Script {
         amount = IERC20(usdcAddr).balanceOf(op);
         console.log("OP USDC:", amount);
 
-       
         vm.startBroadcast(op_k);
 
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
-
 
         address[] memory users = new address[](2);
         users[0] = user1;
         users[1] = user2;
         rent2Repay.batchRent2Repay(users, usdcAddr);
-
 
         amount = IERC20(usdcSupplyAddr).balanceOf(user1);
         console.log("User1 USDC Supply:", amount);
@@ -84,7 +80,7 @@ contract callR2Rscript is Script {
         console.log("OP USDC Debt:", amount);
         amount = IERC20(usdcAddr).balanceOf(op);
         console.log("OP USDC:", amount);
-        
+
         vm.stopBroadcast();
     }
 }

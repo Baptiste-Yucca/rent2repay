@@ -13,21 +13,20 @@ contract ManageTokenPairScript is Script {
         address usdcDebtToken = vm.envAddress("USDC_DEBT_TOKEN");
 
         require(block.chainid == 100, "Gnosis chain");
-        
+
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
-        
+
         // Créer une instance du contrat via le proxy
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
 
-      
         Rent2Repay.TokenConfig memory config = rent2Repay.tokenConfig(usdcToken);
         console.log("Token:", config.token);
         console.log("Supply Token:", config.supplyToken);
         console.log("Debt Token:", config.debtToken);
         console.log("Active:", config.active);
-   
+
         rent2Repay.unauthorizeToken(usdcToken);
         config = rent2Repay.tokenConfig(usdcToken);
         console.log("Token:", config.token);
@@ -42,8 +41,7 @@ contract ManageTokenPairScript is Script {
         console.log("Supply Token:", config.supplyToken);
         console.log("Debt Token:", config.debtToken);
         console.log("Active:", config.active);
-        
-        vm.stopBroadcast();
 
+        vm.stopBroadcast();
     }
 }

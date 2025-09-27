@@ -10,13 +10,13 @@ contract giveApprovalScript is Script {
         // Charger les adresses depuis l'environnement
         address proxyAddress = vm.envAddress("R2R_PROXY_ADDR");
         address rmmAddress = vm.envAddress("RMM_ADDRESS");
-        
+
         require(block.chainid == 100, "Gnosis chain");
-        
+
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
-        
+
         // Créer une instance du contrat via le proxy
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
 
@@ -29,7 +29,7 @@ contract giveApprovalScript is Script {
         rent2Repay.giveApproval(wxdaiAddr, rmmAddress, type(uint256).max);
         rent2Repay.giveApproval(wxdaiSupplyAddr, rmmAddress, type(uint256).max);
         rent2Repay.giveApproval(usdcSupplyAddr, rmmAddress, type(uint256).max);
-        
+
         console.log("Checking allowances RMM");
         uint256 allowance = IERC20(usdcAddr).allowance(proxyAddress, rmmAddress);
         console.log("Allowance USDC:", allowance);
@@ -41,6 +41,5 @@ contract giveApprovalScript is Script {
         console.log("Allowance WXDAI Supply:", allowance);
 
         vm.stopBroadcast();
-
     }
 }

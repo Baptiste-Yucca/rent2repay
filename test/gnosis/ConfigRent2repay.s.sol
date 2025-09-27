@@ -11,28 +11,27 @@ contract configureR2Rscript is Script {
         address rmmAddress = vm.envAddress("RMM_ADDRESS");
         // Vérifier que nous sommes sur Gnosis
         require(block.chainid == 100, "Gnosis chain");
-        
+
         // Charger la clé privée depuis l'environnement
-        uint256 user1_k = vm.envUint("USER1_KEY");
-        address user1 = vm.addr(user1_k);
+        uint256 user1Key = vm.envUint("USER1_KEY");
+        address user1 = vm.addr(user1Key);
         console.log("user1", user1);
         address usdcSupplyAddr = vm.envAddress("USDC_SUPPLY_TOKEN");
         address usdcAddr = vm.envAddress("USDC_TOKEN");
         address wxdaiSupplyAddr = vm.envAddress("WXDAI_SUPPLY_TOKEN");
 
-       
-        vm.startBroadcast(user1_k);
+        vm.startBroadcast(user1Key);
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
 
         address[] memory tokens = new address[](3);
-        tokens[0] = usdcSupplyAddr; 
+        tokens[0] = usdcSupplyAddr;
         tokens[1] = wxdaiSupplyAddr;
         tokens[2] = usdcAddr;
         uint256[] memory amounts = new uint256[](3);
-        amounts[0] = 6 * 10**3; // 0.1 cent
-        amounts[1] = 6 * 10**3; // 0.1 cent
-        amounts[2] = 1 * 10**6; // 1 USDC
-        
+        amounts[0] = 6 * 10 ** 3; // 0.1 cent
+        amounts[1] = 6 * 10 ** 3; // 0.1 cent
+        amounts[2] = 1 * 10 ** 6; // 1 USDC
+
         rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
 
         // approve USDC for Rent2Repay

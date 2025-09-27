@@ -1,18 +1,3 @@
-## Foundry
-
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
-
-Foundry consists of:
-
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
-
 ## Usage
 
 ### Build
@@ -39,28 +24,46 @@ $ forge fmt
 $ forge snapshot
 ```
 
-### Anvil
-
-```shell
-$ anvil
-```
-
 ### Deploy
 
 ```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+$ forge script script/DeployGnosis.s.sol --rpc-url https://rpc.gnosischain.com --broadcast --verify
+```
+
+### Verify
+```shell
+# implementation
+$ forge verify-contract --etherscan-api-key $GNOSISSCAN_API_KEY --chain-id 100 $R2R_IMPLEMENATION_ADDR src/Rent2Repay.sol:Rent2Repay
+# proxy
+$ forge verify-contract --etherscan-api-key $GNOSISSCAN_API_KEY --chain-id 100 $R2R_PROXY_ADDR lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy --constructor-args $(cast abi-encode "constructor(address,bytes)" $R2R_IMPLEMENATION_ADDR 0x)
+```
+### After deploy
+```shell
+#give approval to RMM (supply/repay)
+$ forge script test/gnosis/CallAllApproval.s.sol --rpc-url https://rpc.gnosischain.com --broadcast --verify --verifier-url https://api.gnosisscan.com/api --etherscan-api-key $GNOSISSCAN_API_KEY  
+
+$ forge script test/gnosis/ConfigRent2repay.s.sol --rpc-url https://rpc.gnosischain.com --broadcast --verify --verifier-url https://api.gnosisscan.com/api --etherscan-api-key $GNOSISSCAN_API_KEY
+
+$ forge script test/gnosis/CallRent2repay.s.sol --rpc-url https://rpc.gnosischain.com --broadcast --verify --verifier-url https://api.gnosisscan.com/api --etherscan-api-key $GNOSISSCAN_API_KEY
+
+etc
+```
+
+### Testbook
+```
+https://docs.google.com/spreadsheets/d/1azRgjzlTM9ObizbTXG3P1kgnuy-l-H5QYLK2vVERcGU/
 ```
 
 ### Cast
 
 ```shell
 $ cast <subcommand>
+# example cast call 0xContractAddress "daoFeesBps()(uint256)" --rpc-url https://rpc.gnosischain.com
 ```
 
 ### Help
 
 ```shell
 $ forge --help
-$ anvil --help
 $ cast --help
 ```

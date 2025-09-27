@@ -15,12 +15,9 @@ interface IRMM {
      * @param onBehalfOf The address of the borrower whose debt is being repaid
      * @return The final amount repaid
      */
-    function repay(
-        address asset,
-        uint256 amount,
-        uint256 interestRateMode,
-        address onBehalfOf
-    ) external returns (uint256);
+    function repay(address asset, uint256 amount, uint256 interestRateMode, address onBehalfOf)
+        external
+        returns (uint256);
 
     /**
      * @notice Withdraws supply tokens on behalf of a user
@@ -29,16 +26,7 @@ interface IRMM {
      * @param to The address to send the withdrawn tokens to
      * @return The final amount withdrawn
      */
-    function withdraw(
-        address asset,
-        uint256 amount,
-        address to
-    ) external returns (uint256);
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) external ;
-} 
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+}

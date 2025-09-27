@@ -12,11 +12,11 @@ contract UpdateDaoTokenScript is Script {
         address usdcToken = vm.envAddress("USDC_TOKEN");
 
         require(block.chainid == 100, "Gnosis chain");
-        
+
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
-        
+
         // Créer une instance du contrat via le proxy
         Rent2Repay rent2Repay = Rent2Repay(proxyAddress);
 
@@ -45,7 +45,6 @@ contract UpdateDaoTokenScript is Script {
         daoFeeReductionMinimumAmount = rent2Repay.daoFeeReductionMinimumAmount();
         console.log("DAO Fee Reduction Minimum Amount:", daoFeeReductionMinimumAmount);
 
-
         uint256 daoFeeReductionPercentage = rent2Repay.daoFeeReductionBps();
         console.log("DAO Fee Reduction Percentage:", daoFeeReductionPercentage);
         rent2Repay.updateDaoFeeReductionPercentage(10000);
@@ -58,8 +57,6 @@ contract UpdateDaoTokenScript is Script {
         treasury = rent2Repay.daoTreasuryAddress();
         console.log("DAO Treasury Address:", treasury);
 
-
-
         // rollback
         rent2Repay.updateDaoFeeReductionToken(daoGovernanceToken);
         rent2Repay.updateDaoFees(5000);
@@ -67,8 +64,7 @@ contract UpdateDaoTokenScript is Script {
         rent2Repay.updateDaoFeeReductionMinimumAmount(1);
         rent2Repay.updateDaoTreasuryAddress(address(0x3456789012345678901234567890123456789012));
         rent2Repay.updateDaoFeeReductionPercentage(5000);
-        
-        vm.stopBroadcast();
 
+        vm.stopBroadcast();
     }
 }

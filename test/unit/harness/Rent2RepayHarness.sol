@@ -9,31 +9,19 @@ import "../../../src/Rent2Repay.sol";
  * @dev This contract exposes internal/private functions for testing purposes
  */
 contract Rent2RepayHarness is Rent2Repay {
-    
-
     /// @dev Local copy du getter storage - same as the main contract
     /// @dev can oly be used to  coverage tests
-    function _getHarnessStorage()
-        private
-        pure
-        returns (Rent2RepayStorage storage s)
-    {
+    function _getHarnessStorage() private pure returns (Rent2RepayStorage storage s) {
         assembly {
             s.slot := 0x52C63247E1F47d19d5ce046630c49f7C67dcaEcfb71ba98eedaab2ebca6e0
         }
     }
 
-    function exposed_validTokenAddress(address token) 
-        external 
-        validTokenAddress(token) 
-    {
+    function exposed_validTokenAddress(address token) external validTokenAddress(token) {
         // rien, on veut juste tester le modifier
     }
 
-    function exposed_onlyAuthorizedToken(address token) 
-        external 
-        onlyAuthorizedToken(token) 
-    {
+    function exposed_onlyAuthorizedToken(address token) external onlyAuthorizedToken(token) {
         // rien, on veut juste tester le modifier
     }
 
@@ -89,12 +77,7 @@ contract Rent2RepayHarness is Rent2Repay {
      * @return actualAmountRepaid The actual amount repaid to RMM
      * @return adjustedDaoFees The DAO fees after adjustment
      */
-    function exposed_handleRmmRepayment(
-        address user,
-        address token,
-        uint256 daoFees,
-        uint256 amountForRepayment
-    )
+    function exposed_handleRmmRepayment(address user, address token, uint256 daoFees, uint256 amountForRepayment)
         external
         returns (uint256 actualAmountRepaid, uint256 adjustedDaoFees)
     {
@@ -129,7 +112,6 @@ contract Rent2RepayHarness is Rent2Repay {
         return _isNewPeriod(_user, _token);
     }
 
-
     /**
      * @notice Exposes the internal _removeUserAllTokens function for testing
      * @param user The user to remove
@@ -149,40 +131,40 @@ contract Rent2RepayHarness is Rent2Repay {
 
     /**
      * @notice Fake updateDaoFees function that bypasses validation for testing
-     * @param newFeesBPS New DAO fees in basis points (can be > 10000 for testing)
+     * @param newFeesBps New DAO fees in basis points (can be > 10000 for testing)
      */
-    function fake_updateDaoFees(uint256 newFeesBPS) external {
+    function fake_updateDaoFees(uint256 newFeesBps) external {
         // Bypass the normal validation by temporarily setting senderTips to 0
         // This allows us to set daoFees to any value, then we can set senderTips back
         // We'll use internal calls to avoid authorization issues
         uint256 originalSenderTips = this.senderTipsBps();
-        
+
         // Temporarily set senderTips to 0 to bypass validation
         this.updateSenderTips(0);
-        
+
         // Now we can set daoFees to any value
-        this.updateDaoFees(newFeesBPS);
-        
+        this.updateDaoFees(newFeesBps);
+
         // Restore original senderTips
         this.updateSenderTips(originalSenderTips);
     }
-    
+
     /**
      * @notice Fake updateSenderTips function that bypasses validation for testing
-     * @param newTipsBPS New sender tips in basis points (can be > 10000 for testing)
+     * @param newTipsBps New sender tips in basis points (can be > 10000 for testing)
      */
-    function fake_updateSenderTips(uint256 newTipsBPS) external {
+    function fake_updateSenderTips(uint256 newTipsBps) external {
         // Bypass the normal validation by temporarily setting daoFees to 0
         // This allows us to set senderTips to any value, then we can set daoFees back
         // We'll use internal calls to avoid authorization issues
         uint256 originalDaoFees = this.daoFeesBps();
-        
+
         // Temporarily set daoFees to 0 to bypass validation
         this.updateDaoFees(0);
-        
+
         // Now we can set senderTips to any value
-        this.updateSenderTips(newTipsBPS);
-        
+        this.updateSenderTips(newTipsBps);
+
         // Restore original daoFees
         this.updateDaoFees(originalDaoFees);
     }

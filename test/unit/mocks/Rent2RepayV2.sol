@@ -8,7 +8,6 @@ import "../../../src/Rent2Repay.sol";
  * @dev Version 2 du contrat Rent2Repay pour tester les upgrades UUPS
  */
 contract Rent2RepayV2 is Rent2Repay {
-    
     /**
      * @notice Retourne la version du contrat
      * @return Version string
@@ -16,7 +15,7 @@ contract Rent2RepayV2 is Rent2Repay {
     function version() public pure override returns (string memory) {
         return "2.0.0";
     }
-    
+
     /**
      * @notice Fonction de test pour vérifier que l'upgrade a fonctionné
      * @return true si l'upgrade est réussi
