@@ -135,7 +135,10 @@ contract Rent2RepayTest is Test {
         amounts[0] = 10 ether;
         amounts[1] = 100 * 10 ** 6;
 
-        uint256 period = 5 seconds;
+        uint256[] memory period = new uint256[](3);
+        amounts[0] = 5 seconds;
+        amounts[1] = 5 seconds;
+        amounts[2] = 5 seconds;
         uint256 configTimestamp = block.timestamp;
 
         vm.prank(user);
@@ -187,12 +190,14 @@ contract Rent2RepayTest is Test {
         uint256[] memory amounts2 = new uint256[](1);
         amounts2[0] = 1 ether;
 
+        uint256 ; period[0]=period[1]=period[2]=1 weeks;
+
         // Configurer Rent2Repay pour les deux utilisateurs avec des montants différents
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts1, 1 weeks, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts1, period, block.timestamp);
 
         vm.prank(user2);
-        rent2Repay.configureRent2Repay(tokens, amounts2, 1 weeks, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts2, period, block.timestamp);
 
         // Avancer le temps pour respecter la périodicité
         vm.warp(block.timestamp + 1 weeks + 1 seconds);
@@ -274,8 +279,10 @@ contract Rent2RepayTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 10 ether;
 
+        uint256 ; period[0]=period[1]=period[2]=1 weeks;
+
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 weeks, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         assertTrue(rent2Repay.isAuthorized(user));
 
@@ -294,9 +301,9 @@ contract Rent2RepayTest is Test {
         tokens[0] = address(wxdai);
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 10 ether;
-
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         // Test initial : le contrat n'est pas en pause
         assertFalse(rent2Repay.paused(), "Contract should not be paused initially");
@@ -468,9 +475,9 @@ contract Rent2RepayTest is Test {
         tokens[0] = address(wxdai);
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 10 ether;
-
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         // Test version
         string memory version = rent2Repay.version();
@@ -511,8 +518,10 @@ contract Rent2RepayTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 10 ether;
 
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
+        
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         // Test avec token non autorisé
         vm.prank(user2);
@@ -534,9 +543,11 @@ contract Rent2RepayTest is Test {
         uint256[] memory amounts2 = new uint256[](1); // Différente longueur
         amounts2[0] = 10 ether;
 
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
+
         vm.prank(user);
         vm.expectRevert();
-        rent2Repay.configureRent2Repay(tokens2, amounts2, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens2, amounts2, period, block.timestamp);
 
         // Test configureRent2Repay avec token non autorisé
         address[] memory tokens3 = new address[](1);
@@ -544,9 +555,11 @@ contract Rent2RepayTest is Test {
         uint256[] memory amounts3 = new uint256[](1);
         amounts3[0] = 10 ether;
 
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
+
         vm.prank(user);
         vm.expectRevert();
-        rent2Repay.configureRent2Repay(tokens3, amounts3, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens3, amounts3, period, block.timestamp);
 
         // Test revokeRent2RepayAll avec utilisateur non autorisé
         vm.prank(user2);
@@ -798,8 +811,10 @@ contract Rent2RepayTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 10 ether;
 
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
+
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         // Mettre le contrat en pause
         vm.prank(emergency);
@@ -809,9 +824,10 @@ contract Rent2RepayTest is Test {
         assertTrue(rent2Repay.paused(), "Contract should be paused");
 
         // ===== TEST configureRent2Repay avec pause =====
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
         vm.prank(user);
         vm.expectRevert();
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         // ===== TEST rent2repay avec pause =====
         vm.prank(user2);
@@ -914,8 +930,10 @@ contract Rent2RepayTest is Test {
         configAmounts[0] = 5 ether;
         configAmounts[1] = 1000 * 10 ** 6;
 
+        uint256 ; period[0]=period[1]=period[2]=1 weeks;
+
         vm.prank(unknownUser);
-        rent2Repay.configureRent2Repay(configTokens, configAmounts, 1 weeks, block.timestamp);
+        rent2Repay.configureRent2Repay(configTokens, configAmounts, period, block.timestamp);
 
         // ===== VÉRIFICATION : unknownUser est maintenant configuré =====
         (tokens, maxAmounts) = rent2Repay.getUserConfigs(unknownUser);
@@ -1004,10 +1022,10 @@ contract Rent2RepayTest is Test {
         tokens[0] = address(wxdai);
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 10 ether;
-
+        uint256 ; period[0]=period[1]=period[2]=1 seconds;
         // Configurer user pour rent2repay
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         // Avancer le temps pour respecter la périodicité
         vm.warp(block.timestamp + 2 seconds);
@@ -1131,8 +1149,10 @@ contract Rent2RepayTest is Test {
         amounts[0] = 10000;
         usdc.mint(address(mockRMM), amounts[0]);
 
+        uint256 ; period[0]=period[1]=period[2]=1 weeks;
+
         vm.prank(user);
-        rent2Repay.configureRent2Repay(tokens, amounts, 1 weeks, 1);
+        rent2Repay.configureRent2Repay(tokens, amounts, 1 period, 1);
 
         // User approves the contract to spend supply tokens
         vm.prank(user);

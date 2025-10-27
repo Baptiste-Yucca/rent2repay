@@ -31,8 +31,12 @@ contract configureR2Rscript is Script {
         amounts[0] = 2 * 10 ** 4; // 0.1 cent
         amounts[1] = 3 * 10 ** 16; // 0.1 cent
         amounts[2] = 4 * 10 ** 5; // 1 USDC
+        uint256[] memory period = new uint256[](3);
+        amounts[0] = 4 seconds;
+        amounts[1] = 4 seconds;
+        amounts[2] = 4 seconds;
 
-        rent2Repay.configureRent2Repay(tokens, amounts, 4 seconds, block.timestamp);
+        rent2Repay.configureRent2Repay(tokens, amounts, period, block.timestamp);
 
         // approve USDC for Rent2Repay
         IERC20(usdcAddr).approve(proxyAddress, type(uint256).max);

@@ -188,12 +188,12 @@ contract Rent2Repay is
     function configureRent2Repay(
         address[] calldata tokens,
         uint256[] calldata amounts,
-        uint256 period,
+        uint256[] period,
         uint256 timestamp
     ) external whenNotPaused {
         Rent2RepayStorage storage $ = _getR2rStorage();
         uint256 len = tokens.length;
-        require(len > 0 && len == amounts.length, "Invalid array lengths");
+        require(len > 0 && len == amounts.length && len == period.length, "Invalid array lengths");
 
         /// @dev Force to clean up data
         uint256 maxLength = $.tokenList.length;
@@ -219,8 +219,8 @@ contract Rent2Repay is
                 tokens[i] != address(0) && $.tokenConfig[tokens[i]].active && amounts[i] > 0, "Invalid token or amount"
             );
             $.allowedMaxAmounts[msg.sender][tokens[i]] = amounts[i];
-            $.periodicity[msg.sender][tokens[i]] = period == 0 ? 1 weeks : period;
-            emit SetR2R(msg.sender, tokens[i], amounts[i], period, $.lastRepayTimestamps[msg.sender]);
+            $.periodicity[msg.sender][tokens[i]] = period[i] == 0 ? 1 weeks : period;
+            emit SetR2R(msg.sender, tokens[i], amounts[i], period[i], $.lastRepayTimestamps[msg.sender]);
             unchecked {
                 ++i;
             }
